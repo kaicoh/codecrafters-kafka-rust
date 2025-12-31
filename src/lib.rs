@@ -27,17 +27,17 @@ impl Into<Bytes> for Message {
 
 #[derive(Debug, Clone)]
 pub enum Header {
-    V0 { collation_id: i32 },
+    ResponseV0 { collation_id: i32 },
 }
 
 impl Header {
-    pub fn new_v0(collation_id: i32) -> Self {
-        Header::V0 { collation_id }
+    pub fn new_response_v0(collation_id: i32) -> Self {
+        Header::ResponseV0 { collation_id }
     }
 
     fn byte_size(&self) -> usize {
         match self {
-            Header::V0 { .. } => 4,
+            Header::ResponseV0 { .. } => 4,
         }
     }
 }
@@ -46,7 +46,7 @@ impl Into<Bytes> for Header {
     fn into(self) -> Bytes {
         let mut buf = Vec::with_capacity(self.byte_size());
         match self {
-            Header::V0 { collation_id } => {
+            Header::ResponseV0 { collation_id } => {
                 buf.extend_from_slice(&collation_id.to_be_bytes());
             }
         }
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn test_message_serialization() {
-        let header = Header::V0 { collation_id: 7 };
+        let header = Header::ResponseV0 { collation_id: 7 };
         let message = Message { header };
         let bytes: Bytes = message.into();
         let expected = Bytes::from_static(&[
