@@ -1,5 +1,5 @@
 use codecrafters_kafka as kfk;
-use kfk::{Message, ResponseHeader};
+use kfk::{Message, RequestHeader, ResponseHeader};
 
 use std::net::TcpListener;
 
@@ -15,7 +15,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     for stream in listener.incoming() {
         let mut stream = stream?;
-        let msg = Message::new(ResponseHeader::new_v0(7));
+        let req = Message::<RequestHeader>::from_reader(&mut stream)?;
+        let collaration_id = req.collaration_id();
+        let msg = Message::new(ResponseHeader::new_v0(collaration_id));
         msg.send(&mut stream)?;
     }
 

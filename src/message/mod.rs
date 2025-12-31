@@ -1,5 +1,7 @@
-mod de;
 mod ser;
+
+use crate::{KafkaError, Result};
+use std::io;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message<H: Header> {
@@ -13,6 +15,18 @@ impl<H: Header> Message<H> {
 
     fn message_size(&self) -> i32 {
         self.header.byte_size()
+    }
+}
+
+impl Message<RequestHeader> {
+    pub fn from_reader<R: io::Read>(reader: &mut R) -> Result<Self> {
+        let _size = read_i32(reader)?;
+        let header = RequestHeader::from_reader(reader)?;
+        Ok(Message::new(header))
+    }
+
+    pub fn collaration_id(&self) -> i32 {
+        self.header.collaration_id()
     }
 }
 
@@ -63,4 +77,50 @@ impl Header for RequestHeader {
             }
         }
     }
+}
+
+impl RequestHeader {
+    pub fn from_reader<R: io::Read>(reader: &mut R) -> Result<Self> {
+        let api_key = read_i16(reader)?;
+        let api_version = read_i16(reader)?;
+        let correlation_id = read_i32(reader)?;
+        let client_id = read_string(reader)?;
+
+        Ok(RequestHeader::V2 {
+            api_key,
+            api_version,
+            correlation_id,
+            client_id,
+        })
+    }
+
+    pub fn collaration_id(&self) -> i32 {
+        match self {
+            RequestHeader::V2 { correlation_id, .. } => *correlation_id,
+        }
+    }
+}
+
+fn read_i16<R: io::Read>(reader: &mut R) -> Result<i16> {
+    let mut buf = [0u8; 2];
+    reader.read_exact(&mut buf)?;
+    Ok(i16::from_be_bytes(buf))
+}
+
+fn read_i32<R: io::Read>(reader: &mut R) -> Result<i32> {
+    let mut buf = [0u8; 4];
+    reader.read_exact(&mut buf)?;
+    Ok(i32::from_be_bytes(buf))
+}
+
+fn read_string<R: io::Read>(reader: &mut R) -> Result<Option<String>> {
+    let length = read_i16(reader)?;
+    if length < 0 {
+        return Ok(None);
+    }
+    let mut buf = vec![0u8; length as usize];
+    reader.read_exact(&mut buf)?;
+    let string =
+        String::from_utf8(buf).map_err(|e| KafkaError::DeserializationError(e.to_string()))?;
+    Ok(Some(string))
 }
