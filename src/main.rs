@@ -1,8 +1,6 @@
 use codecrafters_kafka as kfk;
-use kfk::{Header, Message};
+use kfk::{Message, ResponseHeader};
 
-use bytes::Bytes;
-use std::io::Write;
 use std::net::TcpListener;
 
 fn main() {
@@ -17,9 +15,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     for stream in listener.incoming() {
         let mut stream = stream?;
-        let msg = Message::new(Header::new_response_v0(7));
-        let bytes: Bytes = msg.into();
-        stream.write_all(&bytes)?;
+        let msg = Message::new(ResponseHeader::new_v0(7));
+        msg.send(&mut stream)?;
     }
 
     Ok(())
