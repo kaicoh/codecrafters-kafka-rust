@@ -1,6 +1,6 @@
 use crate::KafkaError;
 
-use super::{Message, ResponseHeader};
+use super::{Message, ResponseBody, ResponseHeader};
 use serde::ser::{self, Serialize, SerializeSeq};
 use std::io;
 
@@ -15,18 +15,32 @@ impl Serialize for ResponseHeader {
     }
 }
 
-impl Serialize for Message<ResponseHeader> {
+impl Serialize for ResponseBody {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match self {
+            ResponseBody::ApiVersions => serializer.serialize_unit(),
+        }
+    }
+}
+
+impl Serialize for Message<ResponseHeader, ResponseBody> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
     {
         let mut seq = serializer.serialize_seq(None)?;
         seq.serialize_element(&self.header)?;
+        if let Some(body) = self.body.as_ref() {
+            seq.serialize_element(body)?;
+        }
         seq.end()
     }
 }
 
-impl Message<ResponseHeader> {
+impl Message<ResponseHeader, ResponseBody> {
     pub fn send<W: io::Write>(&self, writer: &mut W) -> Result<(), KafkaError> {
         let message_size = self.message_size();
         let mut serializer = BytesSerializer {
@@ -153,9 +167,8 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut BytesSerializer<W> {
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        Err(KafkaError::SerializationError(
-            "Not support unit serialization".into(),
-        ))
+        // No bytes to write for unit type
+        Ok(())
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
@@ -406,12 +419,13 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for BytesSerializeSeq<'a, W> 
 
 #[cfg(test)]
 mod tests {
+    use super::super::{ResponseBody, ResponseHeader};
     use super::*;
 
     #[test]
     fn test_serialize_response_header_v0() {
         let header = ResponseHeader::V0 { collation_id: 42 };
-        let message = Message::new(header);
+        let message = Message::<ResponseHeader, ResponseBody>::new(header, None);
         let mut buffer: Vec<u8> = Vec::new();
         let message_size = message.message_size();
         let mut serializer = BytesSerializer {

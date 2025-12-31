@@ -66,9 +66,27 @@ impl RequestHeader {
         })
     }
 
+    pub fn api_key(&self) -> i16 {
+        match self {
+            RequestHeader::V2 { api_key, .. } => *api_key,
+        }
+    }
+
+    pub fn api_version(&self) -> i16 {
+        match self {
+            RequestHeader::V2 { api_version, .. } => *api_version,
+        }
+    }
+
     pub fn collaration_id(&self) -> i32 {
         match self {
             RequestHeader::V2 { correlation_id, .. } => *correlation_id,
+        }
+    }
+
+    pub fn client_id(&self) -> Option<&str> {
+        match self {
+            RequestHeader::V2 { client_id, .. } => client_id.as_deref(),
         }
     }
 }
