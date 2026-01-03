@@ -1,44 +1,26 @@
 use crate::{KafkaError, Result};
 use std::io;
 
-pub(crate) fn read_i16<R: io::Read>(reader: &mut R) -> Result<i16> {
-    let mut buf = [0u8; 2];
-    reader.read_exact(&mut buf)?;
-    Ok(i16::from_be_bytes(buf))
-}
+pub(crate) fn encode_unsigned_varint(length: usize) -> Vec<u8> {
+    let mut len = length;
+    let mut bytes = Vec::new();
 
-pub(crate) fn read_i32<R: io::Read>(reader: &mut R) -> Result<i32> {
-    let mut buf = [0u8; 4];
-    reader.read_exact(&mut buf)?;
-    Ok(i32::from_be_bytes(buf))
-}
-
-pub(crate) fn read_string<R: io::Read>(reader: &mut R) -> Result<Option<String>> {
-    let length = read_i16(reader)?;
-    if length < 0 {
-        return Ok(None);
+    loop {
+        let mut byte = (len & 0b0111_1111) as u8;
+        len >>= 7;
+        if len > 0 {
+            byte |= 0b1000_0000; // Set continuation bit
+        }
+        bytes.push(byte);
+        if len == 0 {
+            break;
+        }
     }
-    let mut buf = vec![0u8; length as usize];
-    reader.read_exact(&mut buf)?;
-    let string = String::from_utf8(buf)?;
-    Ok(Some(string))
+
+    bytes
 }
 
-pub(crate) fn read_compact_string<R: io::Read>(reader: &mut R) -> Result<String> {
-    let len = unsigned_varint(reader)? as usize;
-    let mut buf = vec![0u8; len - 1]; // Subtract 1 for the null terminator
-    reader.read_exact(&mut buf)?;
-    let string = String::from_utf8(buf)?;
-    Ok(string)
-}
-
-pub(crate) fn compact_string_size(s: &str) -> usize {
-    let str_len = s.len();
-    let len_bytes = encode_unsigned_varint(str_len + 1); // +1 for null terminator
-    len_bytes.len() + str_len
-}
-
-pub(crate) fn unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u64> {
+pub(crate) fn decode_unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u64> {
     let mut bytes: Vec<u8> = Vec::new();
 
     for byte in LengthBytes::new(reader) {
@@ -96,25 +78,6 @@ impl<'a, R: io::Read + 'a> Iterator for LengthBytes<'a, R> {
     }
 }
 
-pub(crate) fn encode_unsigned_varint(length: usize) -> Vec<u8> {
-    let mut len = length;
-    let mut bytes = Vec::new();
-
-    loop {
-        let mut byte = (len & 0b0111_1111) as u8;
-        len >>= 7;
-        if len > 0 {
-            byte |= 0b1000_0000; // Set continuation bit
-        }
-        bytes.push(byte);
-        if len == 0 {
-            break;
-        }
-    }
-
-    bytes
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,15 +93,15 @@ mod tests {
     }
 
     #[test]
-    fn test_unsigned_varint() {
+    fn test_decode_unsigned_varint() {
         let data = vec![0b1001_0110, 0b0000_0001];
         let mut reader: &[u8] = &data;
-        let length = unsigned_varint(&mut reader).unwrap();
+        let length = decode_unsigned_varint(&mut reader).unwrap();
         assert_eq!(length, 150);
 
         let data = vec![0b0000_0110];
         let mut reader: &[u8] = &data;
-        let length = unsigned_varint(&mut reader).unwrap();
+        let length = decode_unsigned_varint(&mut reader).unwrap();
         assert_eq!(length, 6);
     }
 

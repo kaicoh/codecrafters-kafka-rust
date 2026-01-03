@@ -3,37 +3,27 @@ use crate::KafkaError;
 use serde::ser;
 use std::io;
 
-impl ser::Error for KafkaError {
-    fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        KafkaError::SerializationError(msg.to_string())
-    }
-}
-
-pub(crate) struct KafkaSerializer<W: io::Write> {
-    message_size: i32,
+pub(crate) struct Serializer<W: io::Write> {
     writer: W,
 }
 
-impl<W: io::Write> KafkaSerializer<W> {
-    pub(crate) fn new(message_size: i32, writer: W) -> Self {
-        KafkaSerializer {
-            message_size,
-            writer,
-        }
+impl<W: io::Write> Serializer<W> {
+    pub(crate) fn new(writer: W) -> Self {
+        Serializer { writer }
     }
 }
 
-impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
+impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     type Ok = ();
     type Error = KafkaError;
 
-    type SerializeSeq = KafkaSerializeSeq<'a, W>;
-    type SerializeTuple = KafkaSerializeSeq<'a, W>;
-    type SerializeTupleStruct = KafkaSerializeSeq<'a, W>;
-    type SerializeTupleVariant = KafkaSerializeSeq<'a, W>;
-    type SerializeMap = KafkaSerializeSeq<'a, W>;
-    type SerializeStruct = KafkaSerializeSeq<'a, W>;
-    type SerializeStructVariant = KafkaSerializeSeq<'a, W>;
+    type SerializeSeq = SerializeSeq<'a, W>;
+    type SerializeTuple = SerializeSeq<'a, W>;
+    type SerializeTupleStruct = SerializeSeq<'a, W>;
+    type SerializeTupleVariant = SerializeSeq<'a, W>;
+    type SerializeMap = SerializeSeq<'a, W>;
+    type SerializeStruct = SerializeSeq<'a, W>;
+    type SerializeStructVariant = SerializeSeq<'a, W>;
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
         let byte = if v { 1u8 } else { 0u8 };
@@ -167,11 +157,11 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 
     fn serialize_tuple_struct(
@@ -179,7 +169,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 
     fn serialize_tuple_variant(
@@ -189,11 +179,11 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 
     fn serialize_struct(
@@ -201,7 +191,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 
     fn serialize_struct_variant(
@@ -211,15 +201,15 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        Ok(KafkaSerializeSeq { serializer: self })
+        Ok(SerializeSeq { serializer: self })
     }
 }
 
-pub struct KafkaSerializeSeq<'a, W: io::Write> {
-    serializer: &'a mut KafkaSerializer<W>,
+pub struct SerializeSeq<'a, W: io::Write> {
+    serializer: &'a mut Serializer<W>,
 }
 
-impl<'a, W: io::Write> ser::SerializeSeq for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeSeq for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -235,7 +225,7 @@ impl<'a, W: io::Write> ser::SerializeSeq for KafkaSerializeSeq<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeTuple for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeTuple for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -251,7 +241,7 @@ impl<'a, W: io::Write> ser::SerializeTuple for KafkaSerializeSeq<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeTupleStruct for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeTupleStruct for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -267,7 +257,7 @@ impl<'a, W: io::Write> ser::SerializeTupleStruct for KafkaSerializeSeq<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeTupleVariant for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeTupleVariant for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -283,7 +273,7 @@ impl<'a, W: io::Write> ser::SerializeTupleVariant for KafkaSerializeSeq<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeMap for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeMap for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -303,7 +293,7 @@ impl<'a, W: io::Write> ser::SerializeMap for KafkaSerializeSeq<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeStruct for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeStruct for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -320,7 +310,7 @@ impl<'a, W: io::Write> ser::SerializeStruct for KafkaSerializeSeq<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeStructVariant for KafkaSerializeSeq<'a, W> {
+impl<'a, W: io::Write> ser::SerializeStructVariant for SerializeSeq<'a, W> {
     type Ok = ();
     type Error = KafkaError;
 
@@ -334,5 +324,37 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for KafkaSerializeSeq<'a, W> 
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serialize;
+
+    #[derive(Debug, Serialize)]
+    struct TestStruct {
+        a: i32,
+        b: String,
+        c: bool,
+    }
+
+    #[test]
+    fn test_serializer() {
+        let mut buffer = Vec::new();
+        let mut serializer = Serializer::new(&mut buffer);
+        let test_value = TestStruct {
+            a: 42,
+            b: "Hello".to_string(),
+            c: true,
+        };
+        test_value.serialize(&mut serializer).unwrap();
+        let expected: Vec<u8> = vec![
+            0, 0, 0, 42, // i32
+            0, 5, // length of string
+            72, 101, 108, 108, 111, // "Hello"
+            1,   // bool
+        ];
+        assert_eq!(buffer, expected);
     }
 }

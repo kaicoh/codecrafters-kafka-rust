@@ -1,5 +1,6 @@
 use crate::{
     de::{ByteSeed, VarintLenSeed},
+    primitives::PrimitiveExt,
     util,
 };
 use serde::{
@@ -9,11 +10,17 @@ use serde::{
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct KafkaBytes(Vec<u8>);
+pub(crate) struct Bytes(Vec<u8>);
 
-impl_as_ref!(KafkaBytes, [u8]);
+impl PrimitiveExt for Bytes {
+    fn byte_size(&self) -> usize {
+        4 + self.as_ref().len()
+    }
+}
 
-impl ser::Serialize for KafkaBytes {
+impl_as_ref!(Bytes, [u8]);
+
+impl ser::Serialize for Bytes {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -26,18 +33,18 @@ impl ser::Serialize for KafkaBytes {
     }
 }
 
-impl<'de> de::Deserialize<'de> for KafkaBytes {
+impl<'de> de::Deserialize<'de> for Bytes {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        struct KafkaBytesVisitor;
+        struct BytesVisitor;
 
-        impl<'de> de::Visitor<'de> for KafkaBytesVisitor {
-            type Value = KafkaBytes;
+        impl<'de> de::Visitor<'de> for BytesVisitor {
+            type Value = Bytes;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("KafkaBytes")
+                formatter.write_str("Bytes")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -54,20 +61,28 @@ impl<'de> de::Deserialize<'de> for KafkaBytes {
                 let bytes: Vec<u8> = seq
                     .next_element_seed(byte_seed)?
                     .ok_or_else(|| de::Error::custom("expected byte array element"))?;
-                Ok(KafkaBytes(bytes))
+                Ok(Bytes(bytes))
             }
         }
 
-        deserializer.deserialize_tuple(2, KafkaBytesVisitor)
+        deserializer.deserialize_tuple(2, BytesVisitor)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct KafkaCompactBytes(Vec<u8>);
+pub(crate) struct CompactBytes(Vec<u8>);
 
-impl_as_ref!(KafkaCompactBytes, [u8]);
+impl PrimitiveExt for CompactBytes {
+    fn byte_size(&self) -> usize {
+        let len = self.as_ref().len();
+        let varint_len = util::encode_unsigned_varint(len + 1).len();
+        varint_len + len
+    }
+}
 
-impl ser::Serialize for KafkaCompactBytes {
+impl_as_ref!(CompactBytes, [u8]);
+
+impl ser::Serialize for CompactBytes {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -80,18 +95,18 @@ impl ser::Serialize for KafkaCompactBytes {
     }
 }
 
-impl<'de> de::Deserialize<'de> for KafkaCompactBytes {
+impl<'de> de::Deserialize<'de> for CompactBytes {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        struct KafkaCompactBytesVisitor;
+        struct CompactBytesVisitor;
 
-        impl<'de> de::Visitor<'de> for KafkaCompactBytesVisitor {
-            type Value = KafkaCompactBytes;
+        impl<'de> de::Visitor<'de> for CompactBytesVisitor {
+            type Value = CompactBytes;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("KafkaCompactBytes")
+                formatter.write_str("CompactBytes")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -108,20 +123,29 @@ impl<'de> de::Deserialize<'de> for KafkaCompactBytes {
                 let bytes: Vec<u8> = seq
                     .next_element_seed(byte_seed)?
                     .ok_or_else(|| de::Error::custom("expected byte array element"))?;
-                Ok(KafkaCompactBytes(bytes))
+                Ok(CompactBytes(bytes))
             }
         }
 
-        deserializer.deserialize_tuple(2, KafkaCompactBytesVisitor)
+        deserializer.deserialize_tuple(2, CompactBytesVisitor)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct KafkaNullableBytes(Option<Vec<u8>>);
+pub(crate) struct NullableBytes(Option<Vec<u8>>);
 
-impl_as_ref!(KafkaNullableBytes, Option<Vec<u8>>);
+impl PrimitiveExt for NullableBytes {
+    fn byte_size(&self) -> usize {
+        match self.as_ref() {
+            Some(b) => 4 + b.len(),
+            None => 4,
+        }
+    }
+}
 
-impl ser::Serialize for KafkaNullableBytes {
+impl_as_ref!(NullableBytes, Option<Vec<u8>>);
+
+impl ser::Serialize for NullableBytes {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -144,18 +168,18 @@ impl ser::Serialize for KafkaNullableBytes {
     }
 }
 
-impl<'de> de::Deserialize<'de> for KafkaNullableBytes {
+impl<'de> de::Deserialize<'de> for NullableBytes {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        struct KafkaNullableBytesVisitor;
+        struct NullableBytesVisitor;
 
-        impl<'de> de::Visitor<'de> for KafkaNullableBytesVisitor {
-            type Value = KafkaNullableBytes;
+        impl<'de> de::Visitor<'de> for NullableBytesVisitor {
+            type Value = NullableBytes;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("KafkaNullableBytes")
+                formatter.write_str("NullableBytes")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -166,26 +190,38 @@ impl<'de> de::Deserialize<'de> for KafkaNullableBytes {
                     .next_element()?
                     .ok_or_else(|| de::Error::custom("expected length element"))?;
                 if len < 0 {
-                    return Ok(KafkaNullableBytes(None));
+                    return Ok(NullableBytes(None));
                 }
                 let byte_seed = ByteSeed::new(len as usize);
                 let bytes: Vec<u8> = seq
                     .next_element_seed(byte_seed)?
                     .ok_or_else(|| de::Error::custom("expected byte array element"))?;
-                Ok(KafkaNullableBytes(Some(bytes)))
+                Ok(NullableBytes(Some(bytes)))
             }
         }
 
-        deserializer.deserialize_tuple(2, KafkaNullableBytesVisitor)
+        deserializer.deserialize_tuple(2, NullableBytesVisitor)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct KafkaCompactNullableBytes(Option<Vec<u8>>);
+pub(crate) struct CompactNullableBytes(Option<Vec<u8>>);
 
-impl_as_ref!(KafkaCompactNullableBytes, Option<Vec<u8>>);
+impl PrimitiveExt for CompactNullableBytes {
+    fn byte_size(&self) -> usize {
+        match self.as_ref() {
+            Some(b) => {
+                let varint_len = util::encode_unsigned_varint(b.len() + 1).len();
+                varint_len + b.len()
+            }
+            None => 1,
+        }
+    }
+}
 
-impl ser::Serialize for KafkaCompactNullableBytes {
+impl_as_ref!(CompactNullableBytes, Option<Vec<u8>>);
+
+impl ser::Serialize for CompactNullableBytes {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -208,18 +244,18 @@ impl ser::Serialize for KafkaCompactNullableBytes {
     }
 }
 
-impl<'de> de::Deserialize<'de> for KafkaCompactNullableBytes {
+impl<'de> de::Deserialize<'de> for CompactNullableBytes {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        struct KafkaCompactNullableBytesVisitor;
+        struct CompactNullableBytesVisitor;
 
-        impl<'de> de::Visitor<'de> for KafkaCompactNullableBytesVisitor {
-            type Value = KafkaCompactNullableBytes;
+        impl<'de> de::Visitor<'de> for CompactNullableBytesVisitor {
+            type Value = CompactNullableBytes;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("KafkaCompactNullableBytes")
+                formatter.write_str("CompactNullableBytes")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -230,38 +266,38 @@ impl<'de> de::Deserialize<'de> for KafkaCompactNullableBytes {
                     .next_element_seed(VarintLenSeed)?
                     .ok_or_else(|| de::Error::custom("expected length element"))?;
                 if len == 0 {
-                    return Ok(KafkaCompactNullableBytes(None));
+                    return Ok(CompactNullableBytes(None));
                 }
                 let byte_seed = ByteSeed::new(len - 1);
                 let bytes: Vec<u8> = seq
                     .next_element_seed(byte_seed)?
                     .ok_or_else(|| de::Error::custom("expected byte array element"))?;
-                Ok(KafkaCompactNullableBytes(Some(bytes)))
+                Ok(CompactNullableBytes(Some(bytes)))
             }
         }
 
-        deserializer.deserialize_tuple(2, KafkaCompactNullableBytesVisitor)
+        deserializer.deserialize_tuple(2, CompactNullableBytesVisitor)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{de::KafkaDeserializer, ser::KafkaSerializer};
+    use crate::{de::Deserializer, ser::Serializer};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestBytes {
-        value: KafkaBytes,
+        value: Bytes,
     }
 
     #[test]
     fn test_kafka_bytes_serialization() {
         let data = TestBytes {
-            value: KafkaBytes(b"Hello".to_vec()),
+            value: Bytes(b"Hello".to_vec()),
         };
         let mut buf = Vec::new();
-        let mut serializer = KafkaSerializer::new(0, &mut buf);
+        let mut serializer = Serializer::new(&mut buf);
         data.serialize(&mut serializer).unwrap();
         assert_eq!(
             buf,
@@ -273,28 +309,28 @@ mod tests {
     fn test_kafka_bytes_deserialization() {
         let data: Vec<u8> = vec![0x00, 0x00, 0x00, 0x05, b'H', b'e', b'l', b'l', b'o'];
         let mut reader = &data[..];
-        let mut deserializer = KafkaDeserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(&mut reader);
         let result: TestBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
             TestBytes {
-                value: KafkaBytes(b"Hello".to_vec()),
+                value: Bytes(b"Hello".to_vec()),
             }
         );
     }
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestCompactBytes {
-        value: KafkaCompactBytes,
+        value: CompactBytes,
     }
 
     #[test]
     fn test_kafka_compact_bytes_serialization() {
         let data = TestCompactBytes {
-            value: KafkaCompactBytes(b"World".to_vec()),
+            value: CompactBytes(b"World".to_vec()),
         };
         let mut buf = Vec::new();
-        let mut serializer = KafkaSerializer::new(0, &mut buf);
+        let mut serializer = Serializer::new(&mut buf);
         data.serialize(&mut serializer).unwrap();
         assert_eq!(buf, vec![0x06, b'W', b'o', b'r', b'l', b'd']);
     }
@@ -303,28 +339,28 @@ mod tests {
     fn test_kafka_compact_bytes_deserialization() {
         let data: Vec<u8> = vec![0x06, b'W', b'o', b'r', b'l', b'd'];
         let mut reader = &data[..];
-        let mut deserializer = KafkaDeserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(&mut reader);
         let result: TestCompactBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
             TestCompactBytes {
-                value: KafkaCompactBytes(b"World".to_vec()),
+                value: CompactBytes(b"World".to_vec()),
             }
         );
     }
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestNullableBytes {
-        value: KafkaNullableBytes,
+        value: NullableBytes,
     }
 
     #[test]
     fn test_kafka_nullable_bytes_serialization() {
         let data = TestNullableBytes {
-            value: KafkaNullableBytes(Some(b"Nullable".to_vec())),
+            value: NullableBytes(Some(b"Nullable".to_vec())),
         };
         let mut buf = Vec::new();
-        let mut serializer = KafkaSerializer::new(0, &mut buf);
+        let mut serializer = Serializer::new(&mut buf);
         data.serialize(&mut serializer).unwrap();
         assert_eq!(
             buf,
@@ -334,10 +370,10 @@ mod tests {
         );
 
         let data_none = TestNullableBytes {
-            value: KafkaNullableBytes(None),
+            value: NullableBytes(None),
         };
         let mut buf_none = Vec::new();
-        let mut serializer_none = KafkaSerializer::new(0, &mut buf_none);
+        let mut serializer_none = Serializer::new(&mut buf_none);
         data_none.serialize(&mut serializer_none).unwrap();
         assert_eq!(buf_none, vec![0xFF, 0xFF, 0xFF, 0xFF]);
     }
@@ -348,48 +384,48 @@ mod tests {
             0x00, 0x00, 0x00, 0x08, b'N', b'u', b'l', b'l', b'a', b'b', b'l', b'e',
         ];
         let mut reader = &data[..];
-        let mut deserializer = KafkaDeserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(&mut reader);
         let result: TestNullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
             TestNullableBytes {
-                value: KafkaNullableBytes(Some(b"Nullable".to_vec())),
+                value: NullableBytes(Some(b"Nullable".to_vec())),
             }
         );
 
         let data_none: Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0xFF];
         let mut reader_none = &data_none[..];
-        let mut deserializer_none = KafkaDeserializer::new(&mut reader_none);
+        let mut deserializer_none = Deserializer::new(&mut reader_none);
         let result_none: TestNullableBytes =
             Deserialize::deserialize(&mut deserializer_none).unwrap();
         assert_eq!(
             result_none,
             TestNullableBytes {
-                value: KafkaNullableBytes(None),
+                value: NullableBytes(None),
             }
         );
     }
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestCompactNullableBytes {
-        value: KafkaCompactNullableBytes,
+        value: CompactNullableBytes,
     }
 
     #[test]
     fn test_kafka_compact_nullable_bytes_serialization() {
         let data = TestCompactNullableBytes {
-            value: KafkaCompactNullableBytes(Some(b"Compact".to_vec())),
+            value: CompactNullableBytes(Some(b"Compact".to_vec())),
         };
         let mut buf = Vec::new();
-        let mut serializer = KafkaSerializer::new(0, &mut buf);
+        let mut serializer = Serializer::new(&mut buf);
         data.serialize(&mut serializer).unwrap();
         assert_eq!(buf, vec![0x08, b'C', b'o', b'm', b'p', b'a', b'c', b't']);
 
         let data_none = TestCompactNullableBytes {
-            value: KafkaCompactNullableBytes(None),
+            value: CompactNullableBytes(None),
         };
         let mut buf_none = Vec::new();
-        let mut serializer_none = KafkaSerializer::new(0, &mut buf_none);
+        let mut serializer_none = Serializer::new(&mut buf_none);
         data_none.serialize(&mut serializer_none).unwrap();
         assert_eq!(buf_none, vec![0x00]);
     }
@@ -398,24 +434,24 @@ mod tests {
     fn test_kafka_compact_nullable_bytes_deserialization() {
         let data: Vec<u8> = vec![0x08, b'C', b'o', b'm', b'p', b'a', b'c', b't'];
         let mut reader = &data[..];
-        let mut deserializer = KafkaDeserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(&mut reader);
         let result: TestCompactNullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
             TestCompactNullableBytes {
-                value: KafkaCompactNullableBytes(Some(b"Compact".to_vec())),
+                value: CompactNullableBytes(Some(b"Compact".to_vec())),
             }
         );
 
         let data_none: Vec<u8> = vec![0x00];
         let mut reader_none = &data_none[..];
-        let mut deserializer_none = KafkaDeserializer::new(&mut reader_none);
+        let mut deserializer_none = Deserializer::new(&mut reader_none);
         let result_none: TestCompactNullableBytes =
             Deserialize::deserialize(&mut deserializer_none).unwrap();
         assert_eq!(
             result_none,
             TestCompactNullableBytes {
-                value: KafkaCompactNullableBytes(None),
+                value: CompactNullableBytes(None),
             }
         );
     }
