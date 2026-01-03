@@ -38,7 +38,7 @@ pub(crate) fn compact_string_size(s: &str) -> usize {
     len_bytes.len() + str_len
 }
 
-fn unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u32> {
+pub(crate) fn unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u64> {
     let mut bytes: Vec<u8> = Vec::new();
 
     for byte in LengthBytes::new(reader) {
@@ -46,12 +46,12 @@ fn unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u32> {
         bytes.push(byte);
     }
 
-    let mut len: u32 = bytes.pop().ok_or_else(|| {
+    let mut len: u64 = bytes.pop().ok_or_else(|| {
         KafkaError::DeserializationError("Failed to read unsinged varint length".to_string())
-    })? as u32;
+    })? as u64;
 
     while let Some(byte) = bytes.pop() {
-        len = (len << 7) | (byte as u32);
+        len = (len << 7) | (byte as u64);
     }
 
     Ok(len)
@@ -135,6 +135,11 @@ mod tests {
         let mut reader: &[u8] = &data;
         let length = unsigned_varint(&mut reader).unwrap();
         assert_eq!(length, 150);
+
+        let data = vec![0b0000_0110];
+        let mut reader: &[u8] = &data;
+        let length = unsigned_varint(&mut reader).unwrap();
+        assert_eq!(length, 6);
     }
 
     #[test]
@@ -146,5 +151,9 @@ mod tests {
         let length = 257;
         let encoded = encode_unsigned_varint(length);
         assert_eq!(encoded, vec![0b1000_0001, 0b0000_0010]);
+
+        let length = 6;
+        let encoded = encode_unsigned_varint(length);
+        assert_eq!(encoded, vec![0b0000_0110]);
     }
 }

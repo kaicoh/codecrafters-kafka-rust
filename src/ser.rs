@@ -42,7 +42,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        self.writer.write_all(&[v as u8])?;
+        self.writer.write_all(&v.to_be_bytes())?;
         Ok(())
     }
 
@@ -61,10 +61,9 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut KafkaSerializer<W> {
         Ok(())
     }
 
-    fn serialize_u8(self, _v: u8) -> Result<Self::Ok, Self::Error> {
-        Err(KafkaError::SerializationError(
-            "u8 serialization is not supported".to_string(),
-        ))
+    fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
+        self.writer.write_all(&[v])?;
+        Ok(())
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
@@ -289,24 +288,18 @@ impl<'a, W: io::Write> ser::SerializeMap for KafkaSerializeSeq<'a, W> {
     type Error = KafkaError;
 
     fn serialize_key<T: ?Sized + ser::Serialize>(&mut self, _key: &T) -> Result<(), Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeMap is not supported".to_string(),
-        ))
+        Ok(())
     }
 
     fn serialize_value<T: ?Sized + ser::Serialize>(
         &mut self,
-        _value: &T,
+        value: &T,
     ) -> Result<(), Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeMap is not supported".to_string(),
-        ))
+        value.serialize(&mut *self.serializer)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeMap is not supported".to_string(),
-        ))
+        Ok(())
     }
 }
 
@@ -317,17 +310,13 @@ impl<'a, W: io::Write> ser::SerializeStruct for KafkaSerializeSeq<'a, W> {
     fn serialize_field<T: ?Sized + ser::Serialize>(
         &mut self,
         _key: &'static str,
-        _value: &T,
+        value: &T,
     ) -> Result<(), Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeStruct is not supported".to_string(),
-        ))
+        value.serialize(&mut *self.serializer)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeStruct is not supported".to_string(),
-        ))
+        Ok(())
     }
 }
 
@@ -338,16 +327,12 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for KafkaSerializeSeq<'a, W> 
     fn serialize_field<T: ?Sized + ser::Serialize>(
         &mut self,
         _key: &'static str,
-        _value: &T,
+        value: &T,
     ) -> Result<(), Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeStructVariant is not supported".to_string(),
-        ))
+        value.serialize(&mut *self.serializer)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Err(KafkaError::SerializationError(
-            "SerializeStructVariant is not supported".to_string(),
-        ))
+        Ok(())
     }
 }

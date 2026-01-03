@@ -1,3 +1,4 @@
+pub(crate) mod de;
 mod error;
 pub(crate) mod primitives;
 pub(crate) mod ser;
