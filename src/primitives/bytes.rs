@@ -308,8 +308,7 @@ mod tests {
     #[test]
     fn test_kafka_bytes_deserialization() {
         let data: Vec<u8> = vec![0x00, 0x00, 0x00, 0x05, b'H', b'e', b'l', b'l', b'o'];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -338,8 +337,7 @@ mod tests {
     #[test]
     fn test_kafka_compact_bytes_deserialization() {
         let data: Vec<u8> = vec![0x06, b'W', b'o', b'r', b'l', b'd'];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestCompactBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -383,8 +381,7 @@ mod tests {
         let data: Vec<u8> = vec![
             0x00, 0x00, 0x00, 0x08, b'N', b'u', b'l', b'l', b'a', b'b', b'l', b'e',
         ];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestNullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -394,8 +391,7 @@ mod tests {
         );
 
         let data_none: Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0xFF];
-        let mut reader_none = &data_none[..];
-        let mut deserializer_none = Deserializer::new(&mut reader_none);
+        let mut deserializer_none = Deserializer::new(data_none);
         let result_none: TestNullableBytes =
             Deserialize::deserialize(&mut deserializer_none).unwrap();
         assert_eq!(
@@ -433,8 +429,7 @@ mod tests {
     #[test]
     fn test_kafka_compact_nullable_bytes_deserialization() {
         let data: Vec<u8> = vec![0x08, b'C', b'o', b'm', b'p', b'a', b'c', b't'];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestCompactNullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -444,8 +439,7 @@ mod tests {
         );
 
         let data_none: Vec<u8> = vec![0x00];
-        let mut reader_none = &data_none[..];
-        let mut deserializer_none = Deserializer::new(&mut reader_none);
+        let mut deserializer_none = Deserializer::new(data_none);
         let result_none: TestCompactNullableBytes =
             Deserialize::deserialize(&mut deserializer_none).unwrap();
         assert_eq!(

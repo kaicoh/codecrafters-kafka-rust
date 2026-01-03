@@ -201,7 +201,7 @@ where
                     return Ok(CompactArray(None));
                 }
 
-                let length = (varint - 1) as usize;
+                let length = varint - 1;
                 let array_seed = ArraySeed::<T>::new(length);
                 let vec = seq.next_element_seed(array_seed)?.ok_or_else(|| {
                     de::Error::custom("expected elements for Kafka compact array")
@@ -268,8 +268,7 @@ mod tests {
             0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
             0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
         ];
-        let reader = &data[..];
-        let mut deserializer = Deserializer::new(reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestArray = Deserialize::deserialize(&mut deserializer).unwrap();
         let expected = TestArray {
             array: Array(Some(vec![
@@ -281,8 +280,7 @@ mod tests {
         assert_eq!(result, expected);
 
         let data_none: Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0xFF]; // Length: -1
-        let reader_none = &data_none[..];
-        let mut deserializer_none = Deserializer::new(reader_none);
+        let mut deserializer_none = Deserializer::new(data_none);
         let result_none: TestArray = Deserialize::deserialize(&mut deserializer_none).unwrap();
         let expected_none = TestArray { array: Array(None) };
         assert_eq!(result_none, expected_none);
@@ -331,8 +329,7 @@ mod tests {
             0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
             0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
         ];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestCompactArray = Deserialize::deserialize(&mut deserializer).unwrap();
         let expected = TestCompactArray {
             compact_array: CompactArray(Some(vec![
@@ -344,8 +341,7 @@ mod tests {
         assert_eq!(result, expected);
 
         let data_none: Vec<u8> = vec![0x00]; // Length: 0 (varint)
-        let mut reader_none = &data_none[..];
-        let mut deserializer_none = Deserializer::new(&mut reader_none);
+        let mut deserializer_none = Deserializer::new(data_none);
         let result_none: TestCompactArray =
             Deserialize::deserialize(&mut deserializer_none).unwrap();
         let expected_none = TestCompactArray {

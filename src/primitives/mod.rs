@@ -77,6 +77,6 @@ impl PrimitiveExt for f64 {
 
 impl PrimitiveExt for String {
     fn byte_size(&self) -> usize {
-        2 + self.as_bytes().len()
+        2 + self.len()
     }
 }

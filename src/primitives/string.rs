@@ -62,7 +62,7 @@ impl<'de> de::Deserialize<'de> for CompactString {
                     return Err(de::Error::custom("null compact string is not allowed"));
                 }
 
-                let str_len = (varint_len - 1) as usize;
+                let str_len = varint_len - 1;
                 let bytes = seq
                     .next_element_seed(ByteSeed::new(str_len))?
                     .ok_or_else(|| de::Error::custom("expected string bytes"))?;
@@ -226,7 +226,7 @@ impl<'de> de::Deserialize<'de> for CompactNullableString {
                     return Ok(CompactNullableString(None));
                 }
 
-                let str_len = (varint_len - 1) as usize;
+                let str_len = varint_len - 1;
                 let bytes = seq
                     .next_element_seed(ByteSeed::new(str_len))?
                     .ok_or_else(|| de::Error::custom("expected string bytes"))?;
@@ -266,8 +266,7 @@ mod tests {
     #[test]
     fn test_kafka_compact_str_deserialization() {
         let data: Vec<u8> = vec![6u8, b'h', b'e', b'l', b'l', b'o'];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestCompactStr = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -304,8 +303,7 @@ mod tests {
     #[test]
     fn test_kafka_nullable_str_deserialization() {
         let data: Vec<u8> = vec![0u8, 5u8, b'w', b'o', b'r', b'l', b'd'];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestNullableStr = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -314,8 +312,7 @@ mod tests {
             }
         );
         let data_null: Vec<u8> = vec![255u8, 255u8];
-        let mut reader_null = &data_null[..];
-        let mut deserializer_null = Deserializer::new(&mut reader_null);
+        let mut deserializer_null = Deserializer::new(data_null);
         let result_null: TestNullableStr =
             Deserialize::deserialize(&mut deserializer_null).unwrap();
         assert_eq!(
@@ -353,8 +350,7 @@ mod tests {
     #[test]
     fn test_kafka_compact_nullable_str_deserialization() {
         let data: Vec<u8> = vec![6u8, b'k', b'a', b'f', b'k', b'a'];
-        let mut reader = &data[..];
-        let mut deserializer = Deserializer::new(&mut reader);
+        let mut deserializer = Deserializer::new(data);
         let result: TestCompactNullableStr = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             result,
@@ -364,8 +360,7 @@ mod tests {
         );
 
         let data_null: Vec<u8> = vec![0u8];
-        let mut reader_null = &data_null[..];
-        let mut deserializer_null = Deserializer::new(&mut reader_null);
+        let mut deserializer_null = Deserializer::new(data_null);
         let result_null: TestCompactNullableStr =
             Deserialize::deserialize(&mut deserializer_null).unwrap();
         assert_eq!(
