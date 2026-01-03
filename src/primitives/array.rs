@@ -1,5 +1,12 @@
-use crate::util;
-use serde::ser::{self, SerializeSeq};
+use crate::{
+    de::{ArraySeed, VarintLenSeed},
+    util,
+};
+use serde::{
+    de,
+    ser::{self, SerializeSeq},
+};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct KafkaArray<T>(Option<Vec<T>>);
@@ -38,6 +45,57 @@ where
     }
 }
 
+impl<'de, T> de::Deserialize<'de> for KafkaArray<T>
+where
+    T: de::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct KafkaArrayVisitor<T> {
+            marker: std::marker::PhantomData<T>,
+        }
+
+        impl<'de, T> de::Visitor<'de> for KafkaArrayVisitor<T>
+        where
+            T: de::Deserialize<'de>,
+        {
+            type Value = KafkaArray<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a Kafka array")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let len: i32 = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::custom("expected length for Kafka array"))?;
+
+                if len == -1 {
+                    return Ok(KafkaArray(None));
+                }
+                let array_seed = ArraySeed::<T>::new(len as usize);
+                let vec = seq
+                    .next_element_seed(array_seed)?
+                    .ok_or_else(|| de::Error::custom("expected elements for Kafka array"))?;
+
+                Ok(KafkaArray(Some(vec)))
+            }
+        }
+
+        deserializer.deserialize_tuple(
+            2,
+            KafkaArrayVisitor {
+                marker: std::marker::PhantomData,
+            },
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct KafkaCompactArray<T>(Option<Vec<T>>);
 
@@ -72,5 +130,197 @@ where
                 seq.end()
             }
         }
+    }
+}
+
+impl<'de, T> de::Deserialize<'de> for KafkaCompactArray<T>
+where
+    T: de::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct KafkaCompactArrayVisitor<T> {
+            marker: std::marker::PhantomData<T>,
+        }
+
+        impl<'de, T> de::Visitor<'de> for KafkaCompactArrayVisitor<T>
+        where
+            T: de::Deserialize<'de>,
+        {
+            type Value = KafkaCompactArray<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a Kafka compact array")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let varint: usize = seq
+                    .next_element_seed(VarintLenSeed)?
+                    .ok_or_else(|| de::Error::custom("expected length for Kafka compact array"))?;
+
+                if varint == 0 {
+                    return Ok(KafkaCompactArray(None));
+                }
+
+                let length = (varint - 1) as usize;
+                let array_seed = ArraySeed::<T>::new(length);
+                let vec = seq.next_element_seed(array_seed)?.ok_or_else(|| {
+                    de::Error::custom("expected elements for Kafka compact array")
+                })?;
+
+                Ok(KafkaCompactArray(Some(vec)))
+            }
+        }
+
+        deserializer.deserialize_tuple(
+            2,
+            KafkaCompactArrayVisitor {
+                marker: std::marker::PhantomData,
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{de::KafkaDeserializer, ser::KafkaSerializer};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestArray {
+        array: KafkaArray<String>,
+    }
+
+    #[test]
+    fn test_kafka_array_serialization() {
+        let test_instance = TestArray {
+            array: KafkaArray(Some(vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string(),
+            ])),
+        };
+
+        let mut buffer = Vec::new();
+        let mut serializer = KafkaSerializer::new(0, &mut buffer);
+        test_instance.serialize(&mut serializer).unwrap();
+        let expected_bytes: Vec<u8> = vec![
+            0x00, 0x00, 0x00, 0x03, // Length: 3
+            0x00, 0x05, b'f', b'i', b'r', b's', b't', // "first"
+            0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
+            0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
+        ];
+        assert_eq!(buffer, expected_bytes);
+
+        let test_instance_none = TestArray {
+            array: KafkaArray(None),
+        };
+        let mut buffer_none = Vec::new();
+        let mut serializer_none = KafkaSerializer::new(0, &mut buffer_none);
+        test_instance_none.serialize(&mut serializer_none).unwrap();
+        let expected_bytes_none: Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0xFF]; // Length: -1
+        assert_eq!(buffer_none, expected_bytes_none);
+    }
+
+    #[test]
+    fn test_kafka_array_deserialization() {
+        let data: Vec<u8> = vec![
+            0x00, 0x00, 0x00, 0x03, // Length: 3
+            0x00, 0x05, b'f', b'i', b'r', b's', b't', // "first"
+            0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
+            0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
+        ];
+        let mut reader = &data[..];
+        let mut deserializer = KafkaDeserializer::new(&mut reader);
+        let result: TestArray = Deserialize::deserialize(&mut deserializer).unwrap();
+        let expected = TestArray {
+            array: KafkaArray(Some(vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string(),
+            ])),
+        };
+        assert_eq!(result, expected);
+
+        let data_none: Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0xFF]; // Length: -1
+        let mut reader_none = &data_none[..];
+        let mut deserializer_none = KafkaDeserializer::new(&mut reader_none);
+        let result_none: TestArray = Deserialize::deserialize(&mut deserializer_none).unwrap();
+        let expected_none = TestArray {
+            array: KafkaArray(None),
+        };
+        assert_eq!(result_none, expected_none);
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestCompactArray {
+        compact_array: KafkaCompactArray<String>,
+    }
+
+    #[test]
+    fn test_kafka_compact_array_serialization() {
+        let test_instance = TestCompactArray {
+            compact_array: KafkaCompactArray(Some(vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string(),
+            ])),
+        };
+        let mut buffer = Vec::new();
+        let mut serializer = KafkaSerializer::new(0, &mut buffer);
+        test_instance.serialize(&mut serializer).unwrap();
+        let expected_bytes: Vec<u8> = vec![
+            0x04, // Length: 3 + 1 = 4 (varint)
+            0x00, 0x05, b'f', b'i', b'r', b's', b't', // "first"
+            0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
+            0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
+        ];
+        assert_eq!(buffer, expected_bytes);
+
+        let test_instance_none = TestCompactArray {
+            compact_array: KafkaCompactArray(None),
+        };
+        let mut buffer_none = Vec::new();
+        let mut serializer_none = KafkaSerializer::new(0, &mut buffer_none);
+        test_instance_none.serialize(&mut serializer_none).unwrap();
+        let expected_bytes_none: Vec<u8> = vec![0x00]; // Length: 0 (varint)
+        assert_eq!(buffer_none, expected_bytes_none);
+    }
+
+    #[test]
+    fn test_kafka_compact_array_deserialization() {
+        let data: Vec<u8> = vec![
+            0x04, // Length: 3 + 1 = 4 (varint)
+            0x00, 0x05, b'f', b'i', b'r', b's', b't', // "first"
+            0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
+            0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
+        ];
+        let mut reader = &data[..];
+        let mut deserializer = KafkaDeserializer::new(&mut reader);
+        let result: TestCompactArray = Deserialize::deserialize(&mut deserializer).unwrap();
+        let expected = TestCompactArray {
+            compact_array: KafkaCompactArray(Some(vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string(),
+            ])),
+        };
+        assert_eq!(result, expected);
+
+        let data_none: Vec<u8> = vec![0x00]; // Length: 0 (varint)
+        let mut reader_none = &data_none[..];
+        let mut deserializer_none = KafkaDeserializer::new(&mut reader_none);
+        let result_none: TestCompactArray =
+            Deserialize::deserialize(&mut deserializer_none).unwrap();
+        let expected_none = TestCompactArray {
+            compact_array: KafkaCompactArray(None),
+        };
+        assert_eq!(result_none, expected_none);
     }
 }

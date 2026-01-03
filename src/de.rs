@@ -137,17 +137,17 @@ impl<'de, R: io::Read> de::Deserializer<'de> for &mut KafkaDeserializer<R> {
         visitor.visit_u64(v)
     }
 
-    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let len = util::unsigned_varint(&mut self.reader)? as usize;
-        let mut seq_access = SeqAccess {
-            deserializer: self,
-            len,
-        };
-        visitor.visit_seq(&mut seq_access)
-    }
+    //fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    //where
+    //    V: Visitor<'de>,
+    //{
+    //    let len = util::unsigned_varint(&mut self.reader)? as usize;
+    //    let mut seq_access = SeqAccess {
+    //        deserializer: self,
+    //        len,
+    //    };
+    //    visitor.visit_seq(&mut seq_access)
+    //}
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -187,7 +187,7 @@ impl<'de, R: io::Read> de::Deserializer<'de> for &mut KafkaDeserializer<R> {
     forward_to_deserialize_any! {
         f32 f64 char unit bytes byte_buf
         unit_struct newtype_struct map
-        enum identifier ignored_any option
+        enum identifier ignored_any option seq
     }
 }
 
@@ -275,6 +275,59 @@ impl<'de> de::DeserializeSeed<'de> for ByteSeed {
         D: de::Deserializer<'de>,
     {
         deserializer.deserialize_tuple(self.0, self)
+    }
+}
+
+pub(crate) struct ArraySeed<T> {
+    marker: std::marker::PhantomData<T>,
+    length: usize,
+}
+
+impl<T> ArraySeed<T> {
+    pub(crate) fn new(length: usize) -> Self {
+        ArraySeed {
+            marker: std::marker::PhantomData,
+            length,
+        }
+    }
+}
+
+impl<'de, T> de::Visitor<'de> for ArraySeed<T>
+where
+    T: de::Deserialize<'de>,
+{
+    type Value = Vec<T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a Kafka array")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let mut vec = Vec::with_capacity(self.length);
+        for _ in 0..self.length {
+            let element: T = seq
+                .next_element()?
+                .ok_or_else(|| de::Error::custom("expected element in Kafka array"))?;
+            vec.push(element);
+        }
+        Ok(vec)
+    }
+}
+
+impl<'de, T> de::DeserializeSeed<'de> for ArraySeed<T>
+where
+    T: de::Deserialize<'de>,
+{
+    type Value = Vec<T>;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_tuple(self.length, self)
     }
 }
 

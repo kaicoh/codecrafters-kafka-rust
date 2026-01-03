@@ -10,13 +10,9 @@ macro_rules! impl_as_ref {
 }
 
 mod array;
-mod bool;
 mod bytes;
-mod number;
 mod string;
 
 pub(crate) use array::*;
-pub(crate) use bool::*;
 pub(crate) use bytes::*;
-pub(crate) use number::*;
 pub(crate) use string::*;
