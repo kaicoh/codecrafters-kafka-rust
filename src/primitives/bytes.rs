@@ -1,6 +1,6 @@
 use crate::{
     de::{ByteSeed, VarintLenSeed},
-    primitives::PrimitiveExt,
+    primitives::ByteSize,
     util,
 };
 use serde::{
@@ -12,7 +12,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Bytes(Vec<u8>);
 
-impl PrimitiveExt for Bytes {
+impl ByteSize for Bytes {
     fn byte_size(&self) -> usize {
         4 + self.as_ref().len()
     }
@@ -72,7 +72,7 @@ impl<'de> de::Deserialize<'de> for Bytes {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompactBytes(Vec<u8>);
 
-impl PrimitiveExt for CompactBytes {
+impl ByteSize for CompactBytes {
     fn byte_size(&self) -> usize {
         let len = self.as_ref().len();
         let varint_len = util::encode_unsigned_varint(len + 1).len();
@@ -134,7 +134,7 @@ impl<'de> de::Deserialize<'de> for CompactBytes {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct NullableBytes(Option<Vec<u8>>);
 
-impl PrimitiveExt for NullableBytes {
+impl ByteSize for NullableBytes {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(b) => 4 + b.len(),
@@ -207,7 +207,7 @@ impl<'de> de::Deserialize<'de> for NullableBytes {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompactNullableBytes(Option<Vec<u8>>);
 
-impl PrimitiveExt for CompactNullableBytes {
+impl ByteSize for CompactNullableBytes {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(b) => {

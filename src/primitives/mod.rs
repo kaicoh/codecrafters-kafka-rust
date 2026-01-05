@@ -17,65 +17,65 @@ pub(crate) use array::*;
 pub(crate) use bytes::*;
 pub(crate) use string::*;
 
-pub(crate) trait PrimitiveExt {
+pub(crate) trait ByteSize {
     fn byte_size(&self) -> usize;
 }
 
-impl PrimitiveExt for bool {
+impl ByteSize for bool {
     fn byte_size(&self) -> usize {
         1
     }
 }
 
-impl PrimitiveExt for i8 {
+impl ByteSize for i8 {
     fn byte_size(&self) -> usize {
         1
     }
 }
 
-impl PrimitiveExt for i16 {
+impl ByteSize for i16 {
     fn byte_size(&self) -> usize {
         2
     }
 }
 
-impl PrimitiveExt for i32 {
+impl ByteSize for i32 {
     fn byte_size(&self) -> usize {
         4
     }
 }
 
-impl PrimitiveExt for i64 {
+impl ByteSize for i64 {
     fn byte_size(&self) -> usize {
         8
     }
 }
 
-impl PrimitiveExt for u8 {
+impl ByteSize for u8 {
     fn byte_size(&self) -> usize {
         1
     }
 }
 
-impl PrimitiveExt for u16 {
+impl ByteSize for u16 {
     fn byte_size(&self) -> usize {
         2
     }
 }
 
-impl PrimitiveExt for u32 {
+impl ByteSize for u32 {
     fn byte_size(&self) -> usize {
         4
     }
 }
 
-impl PrimitiveExt for f64 {
+impl ByteSize for f64 {
     fn byte_size(&self) -> usize {
         8
     }
 }
 
-impl PrimitiveExt for String {
+impl ByteSize for String {
     fn byte_size(&self) -> usize {
         2 + self.len()
     }

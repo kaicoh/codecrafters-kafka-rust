@@ -1,6 +1,6 @@
 use crate::{
     de::{ArraySeed, VarintLenSeed},
-    primitives::PrimitiveExt,
+    primitives::ByteSize,
     util,
 };
 use serde::{
@@ -10,21 +10,27 @@ use serde::{
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Array<T: PrimitiveExt>(Option<Vec<T>>);
+pub(crate) struct Array<T: ByteSize>(Option<Vec<T>>);
 
-impl<T> PrimitiveExt for Array<T>
+impl<T: ByteSize> Array<T> {
+    pub(crate) fn new(vec: Option<Vec<T>>) -> Self {
+        Self(vec)
+    }
+}
+
+impl<T> ByteSize for Array<T>
 where
-    T: PrimitiveExt,
+    T: ByteSize,
 {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
-            Some(vec) => 4 + vec.iter().map(PrimitiveExt::byte_size).sum::<usize>(),
+            Some(vec) => 4 + vec.iter().map(ByteSize::byte_size).sum::<usize>(),
             None => 4,
         }
     }
 }
 
-impl<T: PrimitiveExt> AsRef<Option<Vec<T>>> for Array<T> {
+impl<T: ByteSize> AsRef<Option<Vec<T>>> for Array<T> {
     fn as_ref(&self) -> &Option<Vec<T>> {
         &self.0
     }
@@ -33,7 +39,7 @@ impl<T: PrimitiveExt> AsRef<Option<Vec<T>>> for Array<T> {
 impl<T> ser::Serialize for Array<T>
 where
     T: ser::Serialize,
-    T: PrimitiveExt,
+    T: ByteSize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -62,7 +68,7 @@ where
 impl<'de, T> de::Deserialize<'de> for Array<T>
 where
     T: de::Deserialize<'de>,
-    T: PrimitiveExt,
+    T: ByteSize,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -75,7 +81,7 @@ where
         impl<'de, T> de::Visitor<'de> for ArrayVisitor<T>
         where
             T: de::Deserialize<'de>,
-            T: PrimitiveExt,
+            T: ByteSize,
         {
             type Value = Array<T>;
 
@@ -113,24 +119,30 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct CompactArray<T: PrimitiveExt>(Option<Vec<T>>);
+pub(crate) struct CompactArray<T: ByteSize>(Option<Vec<T>>);
 
-impl<T> PrimitiveExt for CompactArray<T>
+impl<T: ByteSize> CompactArray<T> {
+    pub(crate) fn new(vec: Option<Vec<T>>) -> Self {
+        Self(vec)
+    }
+}
+
+impl<T> ByteSize for CompactArray<T>
 where
-    T: PrimitiveExt,
+    T: ByteSize,
 {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(vec) => {
                 let varint_size = util::encode_unsigned_varint(vec.len() + 1).len();
-                varint_size + vec.iter().map(PrimitiveExt::byte_size).sum::<usize>()
+                varint_size + vec.iter().map(ByteSize::byte_size).sum::<usize>()
             }
             None => util::encode_unsigned_varint(0).len(),
         }
     }
 }
 
-impl<T: PrimitiveExt> AsRef<Option<Vec<T>>> for CompactArray<T> {
+impl<T: ByteSize> AsRef<Option<Vec<T>>> for CompactArray<T> {
     fn as_ref(&self) -> &Option<Vec<T>> {
         &self.0
     }
@@ -139,7 +151,7 @@ impl<T: PrimitiveExt> AsRef<Option<Vec<T>>> for CompactArray<T> {
 impl<T> ser::Serialize for CompactArray<T>
 where
     T: ser::Serialize,
-    T: PrimitiveExt,
+    T: ByteSize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -168,7 +180,7 @@ where
 impl<'de, T> de::Deserialize<'de> for CompactArray<T>
 where
     T: de::Deserialize<'de>,
-    T: PrimitiveExt,
+    T: ByteSize,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -181,7 +193,7 @@ where
         impl<'de, T> de::Visitor<'de> for CompactArrayVisitor<T>
         where
             T: de::Deserialize<'de>,
-            T: PrimitiveExt,
+            T: ByteSize,
         {
             type Value = CompactArray<T>;
 

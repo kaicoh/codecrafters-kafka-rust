@@ -1,6 +1,6 @@
 use crate::{
     de::{ByteSeed, VarintLenSeed},
-    primitives::PrimitiveExt,
+    primitives::ByteSize,
     util,
 };
 use serde::{
@@ -12,7 +12,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompactString(String);
 
-impl PrimitiveExt for CompactString {
+impl ByteSize for CompactString {
     fn byte_size(&self) -> usize {
         let len = self.as_ref().len();
         let variant_len = util::encode_unsigned_varint(len + 1).len();
@@ -80,7 +80,7 @@ impl<'de> de::Deserialize<'de> for CompactString {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct NullableString(Option<String>);
 
-impl PrimitiveExt for NullableString {
+impl ByteSize for NullableString {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(s) => 2 + s.len(),
@@ -162,7 +162,7 @@ impl<'de> de::Deserialize<'de> for NullableString {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompactNullableString(Option<String>);
 
-impl PrimitiveExt for CompactNullableString {
+impl ByteSize for CompactNullableString {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(s) => {

@@ -11,12 +11,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind("127.0.0.1:9092")?;
 
     for stream in listener.incoming() {
-        //let mut stream = stream?;
-        //let req = Request::from_reader(&mut stream)?;
-        //let collaration_id = req.collaration_id();
-        //let msg = Response::new(ResponseHeader::new_v0(collaration_id), None);
-        //msg.send(&mut stream)?;
-        unimplemented!()
+        let mut stream = stream?;
+        codecrafters_kafka::handle_stream(&mut stream)?;
     }
 
     Ok(())

@@ -9,15 +9,15 @@ use serde::{
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct TaggedField(Vec<Tag>);
+pub(crate) struct TaggedFields(Vec<Tag>);
 
-impl AsRef<[Tag]> for TaggedField {
+impl AsRef<[Tag]> for TaggedFields {
     fn as_ref(&self) -> &[Tag] {
         &self.0
     }
 }
 
-impl TaggedField {
+impl TaggedFields {
     pub(crate) fn new(tags: Vec<Tag>) -> Self {
         Self(tags)
     }
@@ -29,7 +29,7 @@ impl TaggedField {
     }
 }
 
-impl ser::Serialize for TaggedField {
+impl ser::Serialize for TaggedFields {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -45,15 +45,15 @@ impl ser::Serialize for TaggedField {
     }
 }
 
-impl<'de> de::Deserialize<'de> for TaggedField {
+impl<'de> de::Deserialize<'de> for TaggedFields {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        struct TaggedFieldVisitor;
+        struct TaggedFieldsVisitor;
 
-        impl<'de> de::Visitor<'de> for TaggedFieldVisitor {
-            type Value = TaggedField;
+        impl<'de> de::Visitor<'de> for TaggedFieldsVisitor {
+            type Value = TaggedFields;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a tagged field")
@@ -70,11 +70,11 @@ impl<'de> de::Deserialize<'de> for TaggedField {
                 let tags = seq
                     .next_element_seed(array_seed)?
                     .ok_or_else(|| de::Error::custom("expected tagged fields"))?;
-                Ok(TaggedField::new(tags))
+                Ok(TaggedFields::new(tags))
             }
         }
 
-        deserializer.deserialize_tuple(2, TaggedFieldVisitor)
+        deserializer.deserialize_tuple(2, TaggedFieldsVisitor)
     }
 }
 

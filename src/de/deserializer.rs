@@ -4,6 +4,7 @@ use serde::de::{self, Visitor};
 use serde::forward_to_deserialize_any;
 use std::io::{Cursor, Read};
 
+#[derive(Debug)]
 pub(crate) struct Deserializer {
     cursor: Cursor<Vec<u8>>,
 }
