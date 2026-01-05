@@ -34,12 +34,14 @@ impl ByteSize for ResponseHeader {
 #[serde(untagged)]
 pub(crate) enum ResponseBody {
     ApiVersions(super::api_versions::ApiVersionsResponseBody),
+    DescribeTopicPartitions(super::describe_topic_partitions::DescribeTopicPartitionsResponseBody),
 }
 
 impl ByteSize for ResponseBody {
     fn byte_size(&self) -> usize {
         match self {
             Self::ApiVersions(body) => body.byte_size(),
+            Self::DescribeTopicPartitions(body) => body.byte_size(),
         }
     }
 }

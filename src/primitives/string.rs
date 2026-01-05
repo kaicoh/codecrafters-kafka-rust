@@ -162,6 +162,18 @@ impl<'de> de::Deserialize<'de> for NullableString {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompactNullableString(Option<String>);
 
+impl CompactNullableString {
+    pub fn new(s: Option<String>) -> Self {
+        Self(s)
+    }
+}
+
+impl From<CompactString> for CompactNullableString {
+    fn from(s: CompactString) -> Self {
+        Self(Some(s.0))
+    }
+}
+
 impl ByteSize for CompactNullableString {
     fn byte_size(&self) -> usize {
         match self.as_ref() {

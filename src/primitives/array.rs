@@ -118,6 +118,25 @@ where
     }
 }
 
+impl<T: ByteSize> FromIterator<T> for Array<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let vec: Vec<T> = iter.into_iter().collect();
+        Array::new(Some(vec))
+    }
+}
+
+impl<T: ByteSize> IntoIterator for Array<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self.0 {
+            Some(vec) => vec.into_iter(),
+            None => Vec::new().into_iter(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompactArray<T: ByteSize>(Option<Vec<T>>);
 
@@ -229,6 +248,25 @@ where
                 marker: std::marker::PhantomData,
             },
         )
+    }
+}
+
+impl<T: ByteSize> FromIterator<T> for CompactArray<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let vec: Vec<T> = iter.into_iter().collect();
+        CompactArray::new(Some(vec))
+    }
+}
+
+impl<T: ByteSize> IntoIterator for CompactArray<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self.0 {
+            Some(vec) => vec.into_iter(),
+            None => Vec::new().into_iter(),
+        }
     }
 }
 
