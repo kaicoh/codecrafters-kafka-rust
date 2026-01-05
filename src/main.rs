@@ -12,7 +12,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     for stream in listener.incoming() {
         let stream = stream?;
-        codecrafters_kafka::handle_stream(stream)?;
+        codecrafters_kafka::handle_stream(stream);
     }
 
     Ok(())

@@ -13,7 +13,7 @@ pub type Result<T> = std::result::Result<T, KafkaError>;
 
 use std::io::{Read, Write};
 
-pub fn handle_stream<S>(mut stream: S) -> Result<()>
+pub fn handle_stream<S>(mut stream: S)
 where
     S: Read + Write + Send + 'static,
 {
@@ -34,8 +34,6 @@ where
             }
         }
     });
-
-    Ok(())
 }
 
 fn handle_one_frame<S: Read + Write>(mut stream: S) -> Result<()> {
