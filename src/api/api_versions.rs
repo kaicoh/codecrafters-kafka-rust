@@ -5,8 +5,8 @@ use crate::{
 };
 
 use super::{
-    API_KEY_API_VERSIONS, ErrorCode, Message, RequestHeaderV1, RequestHeaderV2, ResponseBody,
-    ResponseHeader, TaggedFields,
+    API_KEY_API_VERSIONS, API_KEY_DESCRIBE_TOPIC_PARTITIONS, ErrorCode, Message, RequestHeaderV1,
+    RequestHeaderV2, ResponseBody, ResponseHeader, TaggedFields,
 };
 use serde::{Deserialize, Serialize};
 
@@ -19,11 +19,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V0 {
                 error_code: ErrorCode::NoError,
-                api_versions: CompactArray::new(Some(vec![ApiVersionV1 {
-                    api_key: API_KEY_API_VERSIONS,
-                    min_version: 0,
-                    max_version: 4,
-                }])),
+                api_versions: supported_versions_v1(),
             });
             Ok(Message::new(res_header, Some(res_body)))
         }
@@ -34,11 +30,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V1 {
                 error_code: ErrorCode::NoError,
-                api_versions: CompactArray::new(Some(vec![ApiVersionV1 {
-                    api_key: API_KEY_API_VERSIONS,
-                    min_version: 0,
-                    max_version: 4,
-                }])),
+                api_versions: supported_versions_v1(),
                 throttle_time_ms: 0,
             });
             Ok(Message::new(res_header, Some(res_body)))
@@ -50,11 +42,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V1 {
                 error_code: ErrorCode::NoError,
-                api_versions: CompactArray::new(Some(vec![ApiVersionV1 {
-                    api_key: API_KEY_API_VERSIONS,
-                    min_version: 0,
-                    max_version: 4,
-                }])),
+                api_versions: supported_versions_v1(),
                 throttle_time_ms: 0,
             });
             Ok(Message::new(res_header, Some(res_body)))
@@ -66,12 +54,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V3 {
                 error_code: ErrorCode::NoError,
-                api_versions: CompactArray::new(Some(vec![ApiVersionV2 {
-                    api_key: API_KEY_API_VERSIONS,
-                    min_version: 0,
-                    max_version: 4,
-                    tagged_fields: TaggedFields::new(vec![]),
-                }])),
+                api_versions: supported_versions_v2(),
                 throttle_time_ms: 0,
                 tagged_fields: TaggedFields::new(vec![]),
             });
@@ -84,12 +67,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V3 {
                 error_code: ErrorCode::NoError,
-                api_versions: CompactArray::new(Some(vec![ApiVersionV2 {
-                    api_key: API_KEY_API_VERSIONS,
-                    min_version: 0,
-                    max_version: 4,
-                    tagged_fields: TaggedFields::new(vec![]),
-                }])),
+                api_versions: supported_versions_v2(),
                 throttle_time_ms: 0,
                 tagged_fields: TaggedFields::new(vec![]),
             });
@@ -186,4 +164,36 @@ impl ByteSize for ApiVersionV2 {
             + self.max_version.byte_size()
             + self.tagged_fields.byte_size()
     }
+}
+
+fn supported_versions_v1() -> CompactArray<ApiVersionV1> {
+    CompactArray::new(Some(vec![
+        ApiVersionV1 {
+            api_key: API_KEY_API_VERSIONS,
+            min_version: 0,
+            max_version: 4,
+        },
+        ApiVersionV1 {
+            api_key: API_KEY_DESCRIBE_TOPIC_PARTITIONS,
+            min_version: 0,
+            max_version: 1,
+        },
+    ]))
+}
+
+fn supported_versions_v2() -> CompactArray<ApiVersionV2> {
+    CompactArray::new(Some(vec![
+        ApiVersionV2 {
+            api_key: API_KEY_API_VERSIONS,
+            min_version: 0,
+            max_version: 4,
+            tagged_fields: TaggedFields::new(vec![]),
+        },
+        ApiVersionV2 {
+            api_key: API_KEY_DESCRIBE_TOPIC_PARTITIONS,
+            min_version: 0,
+            max_version: 1,
+            tagged_fields: TaggedFields::new(vec![]),
+        },
+    ]))
 }

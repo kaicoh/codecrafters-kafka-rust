@@ -10,6 +10,7 @@ use response::{ErrorCode, Message, ResponseBody, ResponseHeader};
 use tagged_fields::TaggedFields;
 
 const API_KEY_API_VERSIONS: i16 = 18;
+const API_KEY_DESCRIBE_TOPIC_PARTITIONS: i16 = 75;
 
 pub(crate) fn handle(bytes: Vec<u8>) -> Result<Message> {
     if bytes.len() < 4 {
