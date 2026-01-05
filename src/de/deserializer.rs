@@ -134,7 +134,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let v = util::decode_unsigned_varint(&mut self.cursor)?;
-        println!("Deserialized u64: {}", v);
         visitor.visit_u64(v)
     }
 

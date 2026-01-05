@@ -120,6 +120,7 @@ pub enum ErrorCode {
     TopicAuthorizationFailed = 29,
     GroupAuthorizationFailed = 30,
     ClusterAuthorizationFailed = 31,
+    UnsupportedVersion = 35,
 }
 
 impl ser::Serialize for ErrorCode {

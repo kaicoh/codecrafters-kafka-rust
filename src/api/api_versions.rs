@@ -73,10 +73,19 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             });
             Ok(Message::new(res_header, Some(res_body)))
         }
-        _ => Err(KafkaError::UnsupportedVersion {
-            api_key: API_KEY_API_VERSIONS,
-            api_version,
-        }),
+        _ => {
+            let req_header: RequestHeaderV2 = Deserialize::deserialize(&mut de)?;
+            let res_header = ResponseHeader::V0 {
+                correlation_id: req_header.correlation_id,
+            };
+            let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V3 {
+                error_code: ErrorCode::UnsupportedVersion,
+                api_versions: Array::new(Some(vec![])),
+                throttle_time_ms: 0,
+                tagged_fields: TaggedFields::new(vec![]),
+            });
+            Ok(Message::new(res_header, Some(res_body)))
+        }
     }
 }
 
