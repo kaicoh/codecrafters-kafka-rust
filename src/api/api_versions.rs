@@ -176,7 +176,7 @@ fn supported_versions_v1() -> CompactArray<ApiVersionV1> {
         ApiVersionV1 {
             api_key: API_KEY_DESCRIBE_TOPIC_PARTITIONS,
             min_version: 0,
-            max_version: 1,
+            max_version: 0,
         },
     ]))
 }
@@ -192,7 +192,7 @@ fn supported_versions_v2() -> CompactArray<ApiVersionV2> {
         ApiVersionV2 {
             api_key: API_KEY_DESCRIBE_TOPIC_PARTITIONS,
             min_version: 0,
-            max_version: 1,
+            max_version: 0,
             tagged_fields: TaggedFields::new(vec![]),
         },
     ]))
