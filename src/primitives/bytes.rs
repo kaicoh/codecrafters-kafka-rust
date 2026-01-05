@@ -126,7 +126,7 @@ pub(crate) struct CompactBytes(Vec<u8>);
 impl ByteSize for CompactBytes {
     fn byte_size(&self) -> usize {
         let len = self.as_ref().len();
-        let varint_len = util::encode_unsigned_varint(len + 1).len();
+        let varint_len = util::encode_varint_u64((len + 1) as u64).len();
         varint_len + len
     }
 }
@@ -139,7 +139,7 @@ impl ser::Serialize for CompactBytes {
         S: ser::Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
-        let varint = util::encode_unsigned_varint(self.as_ref().len() + 1);
+        let varint = util::encode_varint_u64((self.as_ref().len() + 1) as u64);
         seq.serialize_element(&varint)?;
         seq.serialize_element(self.as_ref())?;
         seq.end()
@@ -262,7 +262,7 @@ impl ByteSize for CompactNullableBytes {
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(b) => {
-                let varint_len = util::encode_unsigned_varint(b.len() + 1).len();
+                let varint_len = util::encode_varint_u64((b.len() + 1) as u64).len();
                 varint_len + b.len()
             }
             None => 1,
@@ -280,14 +280,14 @@ impl ser::Serialize for CompactNullableBytes {
         match self.as_ref() {
             Some(b) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                let varint = util::encode_unsigned_varint(b.len() + 1);
+                let varint = util::encode_varint_u64((b.len() + 1) as u64);
                 seq.serialize_element(&varint)?;
                 seq.serialize_element(b.as_slice())?;
                 seq.end()
             }
             None => {
                 let mut seq = serializer.serialize_seq(Some(1))?;
-                let varint = util::encode_unsigned_varint(0);
+                let varint = util::encode_varint_u64(0);
                 seq.serialize_element(&varint)?;
                 seq.end()
             }

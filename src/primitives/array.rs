@@ -153,10 +153,10 @@ where
     fn byte_size(&self) -> usize {
         match self.as_ref() {
             Some(vec) => {
-                let varint_size = util::encode_unsigned_varint(vec.len() + 1).len();
+                let varint_size = util::encode_varint_u64((vec.len() + 1) as u64).len();
                 varint_size + vec.iter().map(ByteSize::byte_size).sum::<usize>()
             }
-            None => util::encode_unsigned_varint(0).len(),
+            None => util::encode_varint_u64(0).len(),
         }
     }
 }
@@ -179,7 +179,7 @@ where
         match self.as_ref() {
             Some(vec) => {
                 let mut seq = serializer.serialize_seq(Some(1 + vec.len()))?;
-                let varint = util::encode_unsigned_varint(vec.len() + 1);
+                let varint = util::encode_varint_u64((vec.len() + 1) as u64);
                 seq.serialize_element(&varint)?;
                 for item in vec {
                     seq.serialize_element(item)?;
@@ -188,7 +188,7 @@ where
             }
             None => {
                 let mut seq = serializer.serialize_seq(Some(1))?;
-                let varint = util::encode_unsigned_varint(0);
+                let varint = util::encode_varint_u64(0);
                 seq.serialize_element(&varint)?;
                 seq.end()
             }

@@ -15,7 +15,7 @@ pub(crate) struct CompactString(String);
 impl ByteSize for CompactString {
     fn byte_size(&self) -> usize {
         let len = self.as_ref().len();
-        let variant_len = util::encode_unsigned_varint(len + 1).len();
+        let variant_len = util::encode_varint_u64((len + 1) as u64).len();
         variant_len + len
     }
 }
@@ -29,7 +29,7 @@ impl ser::Serialize for CompactString {
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
         let s = self.as_ref();
-        let varint = util::encode_unsigned_varint(s.len() + 1);
+        let varint = util::encode_varint_u64((s.len() + 1) as u64);
         seq.serialize_element(&varint)?;
         seq.serialize_element(s.as_bytes())?;
         seq.end()
@@ -179,7 +179,7 @@ impl ByteSize for CompactNullableString {
         match self.as_ref() {
             Some(s) => {
                 let len = s.len();
-                let variant_len = util::encode_unsigned_varint(len + 1).len();
+                let variant_len = util::encode_varint_u64((len + 1) as u64).len();
                 variant_len + len
             }
             None => 1,
@@ -197,14 +197,14 @@ impl ser::Serialize for CompactNullableString {
         match self.as_ref() {
             Some(s) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                let varint = util::encode_unsigned_varint(s.len() + 1);
+                let varint = util::encode_varint_u64((s.len() + 1) as u64);
                 seq.serialize_element(&varint)?;
                 seq.serialize_element(s.as_bytes())?;
                 seq.end()
             }
             None => {
                 let mut seq = serializer.serialize_seq(Some(1))?;
-                let varint = util::encode_unsigned_varint(0);
+                let varint = util::encode_varint_u64(0);
                 seq.serialize_element(&varint)?;
                 seq.end()
             }

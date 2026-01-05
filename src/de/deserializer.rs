@@ -129,14 +129,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         visitor.visit_u32(u32::from_be_bytes(bytes))
     }
 
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let v = util::decode_unsigned_varint(&mut self.cursor)?;
-        visitor.visit_u64(v)
-    }
-
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -185,8 +177,16 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         }
     }
 
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let buffer = util::read_varint_bytes(&mut self.cursor)?;
+        visitor.visit_byte_buf(buffer)
+    }
+
     forward_to_deserialize_any! {
-        f32 f64 char unit bytes byte_buf
+        u64 f32 f64 char unit bytes
         unit_struct newtype_struct map
         enum identifier ignored_any seq
     }

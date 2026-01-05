@@ -24,7 +24,7 @@ impl TaggedFields {
 
     pub(crate) fn byte_size(&self) -> usize {
         let slice = self.as_ref();
-        let num = util::encode_unsigned_varint(slice.len()).len();
+        let num = util::encode_varint_u64((slice.len()) as u64).len();
         num + slice.iter().map(Tag::byte_size).sum::<usize>()
     }
 }
@@ -36,7 +36,7 @@ impl ser::Serialize for TaggedFields {
     {
         let slice = self.as_ref();
         let mut seq = serializer.serialize_seq(Some(slice.len() + 1))?;
-        let varint_bytes = util::encode_unsigned_varint(slice.len());
+        let varint_bytes = util::encode_varint_u64((slice.len()) as u64);
         seq.serialize_element(&varint_bytes)?;
         for tag in slice {
             seq.serialize_element(tag)?;
@@ -95,8 +95,8 @@ impl Tag {
 
     pub(crate) fn byte_size(&self) -> usize {
         let slice_len = self.as_ref().len();
-        let tag_size = util::encode_unsigned_varint(self.tag as usize).len();
-        let value_len_size = util::encode_unsigned_varint(slice_len).len();
+        let tag_size = util::encode_varint_u64((self.tag as usize) as u64).len();
+        let value_len_size = util::encode_varint_u64((slice_len) as u64).len();
         tag_size + value_len_size + slice_len
     }
 }
@@ -114,9 +114,9 @@ impl ser::Serialize for Tag {
     {
         let slice = self.as_ref();
         let mut seq = serializer.serialize_seq(Some(3))?;
-        let tag_bytes = util::encode_unsigned_varint(self.tag as usize);
+        let tag_bytes = util::encode_varint_u64(self.tag as u64);
         seq.serialize_element(&tag_bytes)?;
-        let value_len_bytes = util::encode_unsigned_varint(slice.len());
+        let value_len_bytes = util::encode_varint_u64((slice.len()) as u64);
         seq.serialize_element(&value_len_bytes)?;
         seq.serialize_element(slice)?;
         seq.end()

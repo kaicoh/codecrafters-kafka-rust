@@ -1,26 +1,7 @@
 use crate::{KafkaError, Result};
 use std::io;
 
-pub(crate) fn encode_unsigned_varint(length: usize) -> Vec<u8> {
-    let mut len = length;
-    let mut bytes = Vec::new();
-
-    loop {
-        let mut byte = (len & 0b0111_1111) as u8;
-        len >>= 7;
-        if len > 0 {
-            byte |= 0b1000_0000; // Set continuation bit
-        }
-        bytes.push(byte);
-        if len == 0 {
-            break;
-        }
-    }
-
-    bytes
-}
-
-pub(crate) fn decode_unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u64> {
+pub(crate) fn read_varint_bytes<R: io::Read>(reader: &mut R) -> Result<Vec<u8>> {
     let mut bytes: Vec<u8> = Vec::new();
 
     for byte in LengthBytes::new(reader) {
@@ -28,15 +9,75 @@ pub(crate) fn decode_unsigned_varint<R: io::Read>(reader: &mut R) -> Result<u64>
         bytes.push(byte);
     }
 
-    let mut len: u64 = bytes.pop().ok_or_else(|| {
-        KafkaError::DeserializationError("Failed to read unsinged varint length".to_string())
-    })? as u64;
+    Ok(bytes)
+}
 
-    while let Some(byte) = bytes.pop() {
-        len = (len << 7) | (byte as u64);
+pub(crate) fn encode_varint_u64(mut v: u64) -> Vec<u8> {
+    let mut bytes = Vec::new();
+
+    loop {
+        let mut byte = (v & 0b0111_1111) as u8;
+        v >>= 7;
+        if v > 0 {
+            byte |= 0b1000_0000; // Set continuation bit
+        }
+        bytes.push(byte);
+        if v == 0 {
+            break;
+        }
     }
 
-    Ok(len)
+    bytes
+}
+
+pub(crate) fn decode_varint_u64(mut bytes: Vec<u8>) -> Result<u64> {
+    let mut v: u64 = bytes.pop().ok_or_else(|| {
+        KafkaError::DeserializationError("Failed to read varint bytes".to_string())
+    })? as u64;
+
+    while let Some(mut byte) = bytes.pop() {
+        byte &= 0b0111_1111; // Clear continuation bit
+        v = (v << 7) | (byte as u64);
+    }
+
+    Ok(v)
+}
+
+pub(crate) fn encode_varint_i32(v: i32) -> Vec<u8> {
+    let mut uv = ((v << 1) ^ (v >> 31)) as u32; // Zigzag encoding
+    let mut bytes = Vec::new();
+
+    loop {
+        let mut byte = (uv & 0b0111_1111) as u8;
+        uv >>= 7;
+        if uv > 0 {
+            byte |= 0b1000_0000; // Set continuation bit
+        }
+        bytes.push(byte);
+        if uv == 0 {
+            break;
+        }
+    }
+
+    bytes
+}
+
+pub(crate) fn decode_varint_i32(mut bytes: Vec<u8>) -> Result<i32> {
+    let mut uv: u32 = bytes.pop().ok_or_else(|| {
+        KafkaError::DeserializationError("Failed to read varint bytes".to_string())
+    })? as u32;
+
+    while let Some(mut byte) = bytes.pop() {
+        byte &= 0b0111_1111; // Clear continuation bit
+        uv = (uv << 7) | (byte as u32);
+    }
+
+    println!("Decoded unsigned varint: {uv}");
+
+    // Zigzag decoding
+    let v = ((uv >> 1) as i32) ^ -((uv & 1) as i32);
+
+    Ok(v)
 }
 
 struct LengthBytes<'a, R: io::Read + 'a> {
@@ -93,30 +134,58 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_unsigned_varint() {
+    fn test_decode_varint_u64() {
         let data = vec![0b1001_0110, 0b0000_0001];
-        let mut reader: &[u8] = &data;
-        let length = decode_unsigned_varint(&mut reader).unwrap();
+        let length = decode_varint_u64(data).unwrap();
         assert_eq!(length, 150);
 
         let data = vec![0b0000_0110];
-        let mut reader: &[u8] = &data;
-        let length = decode_unsigned_varint(&mut reader).unwrap();
+        let length = decode_varint_u64(data).unwrap();
         assert_eq!(length, 6);
     }
 
     #[test]
-    fn test_encode_unsigned_varint() {
+    fn test_encode_varint_u64() {
         let length = 150;
-        let encoded = encode_unsigned_varint(length);
+        let encoded = encode_varint_u64(length);
         assert_eq!(encoded, vec![0b1001_0110, 0b0000_0001]);
 
         let length = 257;
-        let encoded = encode_unsigned_varint(length);
+        let encoded = encode_varint_u64(length);
         assert_eq!(encoded, vec![0b1000_0001, 0b0000_0010]);
 
         let length = 6;
-        let encoded = encode_unsigned_varint(length);
+        let encoded = encode_varint_u64(length);
         assert_eq!(encoded, vec![0b0000_0110]);
+    }
+
+    #[test]
+    fn test_encode_varint_i32() {
+        let v: i32 = 29;
+        let encoded = encode_varint_i32(v);
+        assert_eq!(encoded, vec![0b0011_1010]);
+
+        let v: i32 = -1;
+        let encoded = encode_varint_i32(v);
+        assert_eq!(encoded, vec![0b0000_0001]);
+
+        let v: i32 = -150;
+        let encoded = encode_varint_i32(v);
+        assert_eq!(encoded, vec![0b1010_1011, 0b0000_0010]);
+    }
+
+    #[test]
+    fn test_decode_varint_i32() {
+        let data = vec![0b0011_1010];
+        let decoded = decode_varint_i32(data).unwrap();
+        assert_eq!(decoded, 29);
+
+        let data = vec![0b0000_0001];
+        let decoded = decode_varint_i32(data).unwrap();
+        assert_eq!(decoded, -1);
+
+        let data = vec![0b1010_1011, 0b0000_0010];
+        let decoded = decode_varint_i32(data).unwrap();
+        assert_eq!(decoded, -150);
     }
 }

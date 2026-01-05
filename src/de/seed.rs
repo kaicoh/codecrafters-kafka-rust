@@ -1,3 +1,5 @@
+use crate::util;
+
 use serde::de;
 use std::fmt;
 
@@ -10,11 +12,13 @@ impl<'de> de::Visitor<'de> for VarintLenSeed {
         formatter.write_str("an unsigned varint length")
     }
 
-    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    fn visit_byte_buf<E>(self, value: Vec<u8>) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Ok(value as usize)
+        let v = util::decode_varint_u64(value)
+            .map_err(|e| de::Error::custom(format!("failed to decode varint length: {e}")))?;
+        Ok(v as usize)
     }
 }
 
@@ -25,7 +29,7 @@ impl<'de> de::DeserializeSeed<'de> for VarintLenSeed {
     where
         D: de::Deserializer<'de>,
     {
-        deserializer.deserialize_u64(self)
+        deserializer.deserialize_byte_buf(self)
     }
 }
 
