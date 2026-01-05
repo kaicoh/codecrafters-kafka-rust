@@ -1,7 +1,7 @@
 use crate::{
-    KafkaError, Result,
+    Result,
     de::Deserializer,
-    primitives::{Array, ByteSize},
+    primitives::{ByteSize, CompactArray},
 };
 
 use super::{
@@ -19,7 +19,11 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V0 {
                 error_code: ErrorCode::NoError,
-                api_versions: Array::new(Some(vec![])),
+                api_versions: CompactArray::new(Some(vec![ApiVersionV1 {
+                    api_key: API_KEY_API_VERSIONS,
+                    min_version: 0,
+                    max_version: 4,
+                }])),
             });
             Ok(Message::new(res_header, Some(res_body)))
         }
@@ -30,7 +34,11 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V1 {
                 error_code: ErrorCode::NoError,
-                api_versions: Array::new(Some(vec![])),
+                api_versions: CompactArray::new(Some(vec![ApiVersionV1 {
+                    api_key: API_KEY_API_VERSIONS,
+                    min_version: 0,
+                    max_version: 4,
+                }])),
                 throttle_time_ms: 0,
             });
             Ok(Message::new(res_header, Some(res_body)))
@@ -42,7 +50,11 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V1 {
                 error_code: ErrorCode::NoError,
-                api_versions: Array::new(Some(vec![])),
+                api_versions: CompactArray::new(Some(vec![ApiVersionV1 {
+                    api_key: API_KEY_API_VERSIONS,
+                    min_version: 0,
+                    max_version: 4,
+                }])),
                 throttle_time_ms: 0,
             });
             Ok(Message::new(res_header, Some(res_body)))
@@ -54,7 +66,12 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V3 {
                 error_code: ErrorCode::NoError,
-                api_versions: Array::new(Some(vec![])),
+                api_versions: CompactArray::new(Some(vec![ApiVersionV2 {
+                    api_key: API_KEY_API_VERSIONS,
+                    min_version: 0,
+                    max_version: 4,
+                    tagged_fields: TaggedFields::new(vec![]),
+                }])),
                 throttle_time_ms: 0,
                 tagged_fields: TaggedFields::new(vec![]),
             });
@@ -67,7 +84,12 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V3 {
                 error_code: ErrorCode::NoError,
-                api_versions: Array::new(Some(vec![])),
+                api_versions: CompactArray::new(Some(vec![ApiVersionV2 {
+                    api_key: API_KEY_API_VERSIONS,
+                    min_version: 0,
+                    max_version: 4,
+                    tagged_fields: TaggedFields::new(vec![]),
+                }])),
                 throttle_time_ms: 0,
                 tagged_fields: TaggedFields::new(vec![]),
             });
@@ -80,7 +102,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
             };
             let res_body = ResponseBody::ApiVersions(ApiVersionsResponseBody::V3 {
                 error_code: ErrorCode::UnsupportedVersion,
-                api_versions: Array::new(Some(vec![])),
+                api_versions: CompactArray::new(Some(vec![])),
                 throttle_time_ms: 0,
                 tagged_fields: TaggedFields::new(vec![]),
             });
@@ -94,16 +116,16 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
 pub(crate) enum ApiVersionsResponseBody {
     V0 {
         error_code: ErrorCode,
-        api_versions: Array<ApiVersion>,
+        api_versions: CompactArray<ApiVersionV1>,
     },
     V1 {
         error_code: ErrorCode,
-        api_versions: Array<ApiVersion>,
+        api_versions: CompactArray<ApiVersionV1>,
         throttle_time_ms: i32,
     },
     V3 {
         error_code: ErrorCode,
-        api_versions: Array<ApiVersion>,
+        api_versions: CompactArray<ApiVersionV2>,
         throttle_time_ms: i32,
         tagged_fields: TaggedFields,
     },
@@ -137,14 +159,31 @@ impl ByteSize for ApiVersionsResponseBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub(crate) struct ApiVersion {
+pub(crate) struct ApiVersionV1 {
     api_key: i16,
     min_version: i16,
     max_version: i16,
 }
 
-impl ByteSize for ApiVersion {
+impl ByteSize for ApiVersionV1 {
     fn byte_size(&self) -> usize {
         self.api_key.byte_size() + self.min_version.byte_size() + self.max_version.byte_size()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub(crate) struct ApiVersionV2 {
+    api_key: i16,
+    min_version: i16,
+    max_version: i16,
+    tagged_fields: TaggedFields,
+}
+
+impl ByteSize for ApiVersionV2 {
+    fn byte_size(&self) -> usize {
+        self.api_key.byte_size()
+            + self.min_version.byte_size()
+            + self.max_version.byte_size()
+            + self.tagged_fields.byte_size()
     }
 }
