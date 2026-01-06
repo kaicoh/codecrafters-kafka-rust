@@ -1,4 +1,4 @@
-use crate::primitives::NullableString;
+use crate::types::NullableString;
 
 use super::TaggedFields;
 use serde::Deserialize;

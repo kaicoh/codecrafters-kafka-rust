@@ -1,7 +1,7 @@
 use crate::{
     Result,
     de::Deserializer,
-    primitives::{ByteSize, CompactArray, CompactNullableString, CompactString, Uuid},
+    types::{ByteSizeExt, CompactArray, CompactNullableString, CompactString, Uuid},
 };
 
 use super::{
@@ -70,7 +70,7 @@ struct RequestTopic {
     tagged_fields: TaggedFields,
 }
 
-impl ByteSize for RequestTopic {
+impl ByteSizeExt for RequestTopic {
     fn byte_size(&self) -> usize {
         self.name.byte_size() + self.tagged_fields.byte_size()
     }
@@ -83,7 +83,7 @@ struct Cursor {
     tagged_fields: TaggedFields,
 }
 
-impl ByteSize for Cursor {
+impl ByteSizeExt for Cursor {
     fn byte_size(&self) -> usize {
         self.topic_name.byte_size()
             + self.partition_index.byte_size()
@@ -102,7 +102,7 @@ pub(crate) enum DescribeTopicPartitionsResponseBody {
     },
 }
 
-impl ByteSize for DescribeTopicPartitionsResponseBody {
+impl ByteSizeExt for DescribeTopicPartitionsResponseBody {
     fn byte_size(&self) -> usize {
         match self {
             Self::V0 {
@@ -131,7 +131,7 @@ pub(crate) struct ResponseTopic {
     tagged_fields: TaggedFields,
 }
 
-impl ByteSize for ResponseTopic {
+impl ByteSizeExt for ResponseTopic {
     fn byte_size(&self) -> usize {
         self.error_code.byte_size()
             + self.name.byte_size()
@@ -157,7 +157,7 @@ pub(crate) struct Partition {
     tagged_fields: TaggedFields,
 }
 
-impl ByteSize for Partition {
+impl ByteSizeExt for Partition {
     fn byte_size(&self) -> usize {
         self.error_code.byte_size()
             + self.partition_index.byte_size()
@@ -187,7 +187,7 @@ impl ser::Serialize for NextCursor {
     }
 }
 
-impl ByteSize for NextCursor {
+impl ByteSizeExt for NextCursor {
     fn byte_size(&self) -> usize {
         match self.0.as_ref() {
             Some(cursor) => cursor.byte_size(),

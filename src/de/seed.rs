@@ -33,6 +33,36 @@ impl<'de> de::DeserializeSeed<'de> for VarintLenSeed {
     }
 }
 
+pub(crate) struct VarintI32Seed;
+
+impl<'de> de::Visitor<'de> for VarintI32Seed {
+    type Value = i32;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a varint encoded i32")
+    }
+
+    fn visit_byte_buf<E>(self, value: Vec<u8>) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let v = util::decode_varint_i32(value)
+            .map_err(|e| de::Error::custom(format!("failed to decode varint i32: {e}")))?;
+        Ok(v)
+    }
+}
+
+impl<'de> de::DeserializeSeed<'de> for VarintI32Seed {
+    type Value = i32;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_byte_buf(self)
+    }
+}
+
 pub(crate) struct ByteSeed(usize);
 
 impl ByteSeed {

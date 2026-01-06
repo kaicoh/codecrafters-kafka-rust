@@ -1,7 +1,7 @@
 use crate::{
     Result,
     de::Deserializer,
-    primitives::{ByteSize, CompactArray},
+    types::{ByteSizeExt, CompactArray},
 };
 
 use super::{
@@ -109,7 +109,7 @@ pub(crate) enum ApiVersionsResponseBody {
     },
 }
 
-impl ByteSize for ApiVersionsResponseBody {
+impl ByteSizeExt for ApiVersionsResponseBody {
     fn byte_size(&self) -> usize {
         match self {
             Self::V0 {
@@ -143,7 +143,7 @@ pub(crate) struct ApiVersionV1 {
     max_version: i16,
 }
 
-impl ByteSize for ApiVersionV1 {
+impl ByteSizeExt for ApiVersionV1 {
     fn byte_size(&self) -> usize {
         self.api_key.byte_size() + self.min_version.byte_size() + self.max_version.byte_size()
     }
@@ -157,7 +157,7 @@ pub(crate) struct ApiVersionV2 {
     tagged_fields: TaggedFields,
 }
 
-impl ByteSize for ApiVersionV2 {
+impl ByteSizeExt for ApiVersionV2 {
     fn byte_size(&self) -> usize {
         self.api_key.byte_size()
             + self.min_version.byte_size()

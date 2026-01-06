@@ -1,6 +1,6 @@
 use crate::{KafkaError, util};
 
-use serde::de::{self, Visitor};
+use serde::de::{self, Deserializer as SerdeDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
 use std::io::{Cursor, Read};
 
@@ -185,10 +185,23 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         visitor.visit_byte_buf(buffer)
     }
 
+    fn deserialize_enum<V>(
+        self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let enum_access = EnumAccess { deserializer: self };
+        visitor.visit_enum(enum_access)
+    }
+
     forward_to_deserialize_any! {
         u64 f32 f64 char unit bytes
-        unit_struct newtype_struct map
-        enum identifier ignored_any seq
+        unit_struct newtype_struct
+        identifier ignored_any seq map
     }
 }
 
@@ -210,6 +223,67 @@ impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a> {
         self.len -= 1;
         let value = seed.deserialize(&mut *self.deserializer)?;
         Ok(Some(value))
+    }
+}
+
+struct EnumAccess<'a> {
+    deserializer: &'a mut Deserializer,
+}
+
+impl<'de, 'a> de::EnumAccess<'de> for EnumAccess<'a> {
+    type Error = KafkaError;
+    type Variant = VariantAccess<'a>;
+
+    fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        let val = seed.deserialize(&mut *self.deserializer)?;
+        Ok((
+            val,
+            VariantAccess {
+                deserializer: self.deserializer,
+            },
+        ))
+    }
+}
+
+struct VariantAccess<'a> {
+    deserializer: &'a mut Deserializer,
+}
+
+impl<'de, 'a> de::VariantAccess<'de> for VariantAccess<'a> {
+    type Error = KafkaError;
+
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        Err(KafkaError::DeserializationError(
+            "unit_variant is not supported".to_string(),
+        ))
+    }
+
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(&mut *self.deserializer)
+    }
+
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserializer.deserialize_tuple(len, visitor)
+    }
+
+    fn struct_variant<V>(
+        self,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserializer.deserialize_struct("", fields, visitor)
     }
 }
 

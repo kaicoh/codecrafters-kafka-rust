@@ -2,7 +2,7 @@ mod deserializer;
 mod seed;
 
 pub(crate) use deserializer::Deserializer;
-pub(crate) use seed::{ArraySeed, ByteSeed, VarintLenSeed};
+pub(crate) use seed::*;
 
 use crate::KafkaError;
 

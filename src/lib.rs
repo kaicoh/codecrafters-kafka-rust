@@ -1,8 +1,8 @@
 mod api;
 pub(crate) mod de;
 mod error;
-pub(crate) mod primitives;
 pub(crate) mod ser;
+pub(crate) mod types;
 pub(crate) mod util;
 
 use ser::Serializer;

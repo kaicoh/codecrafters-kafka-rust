@@ -1,4 +1,4 @@
-use crate::primitives::ByteSize;
+use crate::types::ByteSizeExt;
 
 use super::TaggedFields;
 use serde::{
@@ -18,7 +18,7 @@ pub(crate) enum ResponseHeader {
     },
 }
 
-impl ByteSize for ResponseHeader {
+impl ByteSizeExt for ResponseHeader {
     fn byte_size(&self) -> usize {
         match self {
             Self::V0 { correlation_id } => correlation_id.byte_size(),
@@ -37,7 +37,7 @@ pub(crate) enum ResponseBody {
     DescribeTopicPartitions(super::describe_topic_partitions::DescribeTopicPartitionsResponseBody),
 }
 
-impl ByteSize for ResponseBody {
+impl ByteSizeExt for ResponseBody {
     fn byte_size(&self) -> usize {
         match self {
             Self::ApiVersions(body) => body.byte_size(),
@@ -58,7 +58,7 @@ impl Message {
     }
 }
 
-impl ByteSize for Message {
+impl ByteSizeExt for Message {
     fn byte_size(&self) -> usize {
         self.header.byte_size()
             + match self.body.as_ref() {
@@ -134,7 +134,7 @@ impl ser::Serialize for ErrorCode {
     }
 }
 
-impl ByteSize for ErrorCode {
+impl ByteSizeExt for ErrorCode {
     fn byte_size(&self) -> usize {
         (*self as i16).byte_size()
     }

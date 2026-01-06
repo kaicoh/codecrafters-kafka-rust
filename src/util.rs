@@ -80,6 +80,41 @@ pub(crate) fn decode_varint_i32(mut bytes: Vec<u8>) -> Result<i32> {
     Ok(v)
 }
 
+pub(crate) fn encode_varint_i64(v: i64) -> Vec<u8> {
+    let mut uv = ((v << 1) ^ (v >> 63)) as u64; // Zigzag encoding
+    let mut bytes = Vec::new();
+
+    loop {
+        let mut byte = (uv & 0b0111_1111) as u8;
+        uv >>= 7;
+        if uv > 0 {
+            byte |= 0b1000_0000; // Set continuation bit
+        }
+        bytes.push(byte);
+        if uv == 0 {
+            break;
+        }
+    }
+
+    bytes
+}
+
+pub(crate) fn decode_varint_i64(mut bytes: Vec<u8>) -> Result<i64> {
+    let mut uv: u64 = bytes.pop().ok_or_else(|| {
+        KafkaError::DeserializationError("Failed to read varint bytes".to_string())
+    })? as u64;
+
+    while let Some(mut byte) = bytes.pop() {
+        byte &= 0b0111_1111; // Clear continuation bit
+        uv = (uv << 7) | (byte as u64);
+    }
+
+    // Zigzag decoding
+    let v = ((uv >> 1) as i64) ^ -((uv & 1) as i64);
+
+    Ok(v)
+}
+
 struct LengthBytes<'a, R: io::Read + 'a> {
     reader: &'a mut R,
     finished: bool,
