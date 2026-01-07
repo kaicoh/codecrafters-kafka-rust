@@ -72,8 +72,6 @@ pub(crate) fn decode_varint_i32(mut bytes: Vec<u8>) -> Result<i32> {
         uv = (uv << 7) | (byte as u32);
     }
 
-    println!("Decoded unsigned varint: {uv}");
-
     // Zigzag decoding
     let v = ((uv >> 1) as i32) ^ -((uv & 1) as i32);
 

@@ -2,26 +2,20 @@ use crate::{KafkaError, util};
 
 use serde::de::{self, Deserializer as SerdeDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
-use std::io::{Cursor, Read};
+use std::io::{ErrorKind, Read};
 
 #[derive(Debug)]
-pub(crate) struct Deserializer {
-    cursor: Cursor<Vec<u8>>,
+pub(crate) struct Deserializer<R> {
+    rdr: R,
 }
 
-impl Deserializer {
-    pub(crate) fn new(bytes: Vec<u8>) -> Self {
-        Deserializer {
-            cursor: Cursor::new(bytes),
-        }
-    }
-
-    fn is_eof(&self) -> bool {
-        self.cursor.position() as usize >= self.cursor.get_ref().len()
+impl<R> Deserializer<R> {
+    pub(crate) fn new(rdr: R) -> Self {
+        Deserializer { rdr }
     }
 }
 
-impl<'de> de::Deserializer<'de> for &mut Deserializer {
+impl<'de, R: Read> de::Deserializer<'de> for &mut Deserializer<R> {
     type Error = KafkaError;
 
     fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
@@ -38,7 +32,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut length_bytes = [0u8; 2];
-        self.cursor.read_exact(&mut length_bytes)?;
+        self.rdr.read_exact(&mut length_bytes)?;
         let length = i16::from_be_bytes(length_bytes);
         if length < 0 {
             return Err(KafkaError::DeserializationError(
@@ -46,7 +40,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
             ));
         }
         let mut string_bytes = vec![0u8; length as usize];
-        self.cursor.read_exact(&mut string_bytes)?;
+        self.rdr.read_exact(&mut string_bytes)?;
         visitor.visit_bytes(&string_bytes)
     }
 
@@ -62,7 +56,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut byte = [0u8; 1];
-        self.cursor.read_exact(&mut byte)?;
+        self.rdr.read_exact(&mut byte)?;
         visitor.visit_bool(byte[0] == 1)
     }
 
@@ -71,7 +65,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut byte = [0u8; 1];
-        self.cursor.read_exact(&mut byte)?;
+        self.rdr.read_exact(&mut byte)?;
         visitor.visit_i8(i8::from_be_bytes(byte))
     }
 
@@ -80,7 +74,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut bytes = [0u8; 2];
-        self.cursor.read_exact(&mut bytes)?;
+        self.rdr.read_exact(&mut bytes)?;
         visitor.visit_i16(i16::from_be_bytes(bytes))
     }
 
@@ -89,7 +83,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut bytes = [0u8; 4];
-        self.cursor.read_exact(&mut bytes)?;
+        self.rdr.read_exact(&mut bytes)?;
         visitor.visit_i32(i32::from_be_bytes(bytes))
     }
 
@@ -98,7 +92,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut bytes = [0u8; 8];
-        self.cursor.read_exact(&mut bytes)?;
+        self.rdr.read_exact(&mut bytes)?;
         visitor.visit_i64(i64::from_be_bytes(bytes))
     }
 
@@ -107,7 +101,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut byte = [0u8; 1];
-        self.cursor.read_exact(&mut byte)?;
+        self.rdr.read_exact(&mut byte)?;
         visitor.visit_u8(byte[0])
     }
 
@@ -116,7 +110,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut bytes = [0u8; 2];
-        self.cursor.read_exact(&mut bytes)?;
+        self.rdr.read_exact(&mut bytes)?;
         visitor.visit_u16(u16::from_be_bytes(bytes))
     }
 
@@ -125,8 +119,19 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         V: Visitor<'de>,
     {
         let mut bytes = [0u8; 4];
-        self.cursor.read_exact(&mut bytes)?;
+        self.rdr.read_exact(&mut bytes)?;
         visitor.visit_u32(u32::from_be_bytes(bytes))
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let mut seq_access = SeqAccess {
+            deserializer: self,
+            len: None,
+        };
+        visitor.visit_seq(&mut seq_access)
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -135,7 +140,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
     {
         let mut seq_access = SeqAccess {
             deserializer: self,
-            len,
+            len: Some(len),
         };
         visitor.visit_seq(&mut seq_access)
     }
@@ -164,24 +169,11 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
         self.deserialize_tuple(len, visitor)
     }
 
-    // NOTE:
-    // Option can be used only if it is the last field of a struct like message body.
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        if self.is_eof() {
-            visitor.visit_none()
-        } else {
-            visitor.visit_some(self)
-        }
-    }
-
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let buffer = util::read_varint_bytes(&mut self.cursor)?;
+        let buffer = util::read_varint_bytes(&mut self.rdr)?;
         visitor.visit_byte_buf(buffer)
     }
 
@@ -200,39 +192,46 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer {
 
     forward_to_deserialize_any! {
         u64 f32 f64 char unit bytes
-        unit_struct newtype_struct
-        identifier ignored_any seq map
+        unit_struct newtype_struct option
+        identifier ignored_any map
     }
 }
 
-struct SeqAccess<'a> {
-    deserializer: &'a mut Deserializer,
-    len: usize,
+struct SeqAccess<'a, R> {
+    deserializer: &'a mut Deserializer<R>,
+    len: Option<usize>,
 }
 
-impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a> {
+impl<'de, 'a, R: Read> de::SeqAccess<'de> for SeqAccess<'a, R> {
     type Error = KafkaError;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        if self.len == 0 {
-            return Ok(None);
+        match self.len.as_mut() {
+            Some(len) if *len == 0 => Ok(None),
+            Some(len) => {
+                *len -= 1;
+                let value = seed.deserialize(&mut *self.deserializer)?;
+                Ok(Some(value))
+            }
+            None => match seed.deserialize(&mut *self.deserializer) {
+                Ok(value) => Ok(Some(value)),
+                Err(KafkaError::IoError(err)) if err.kind() == ErrorKind::UnexpectedEof => Ok(None),
+                Err(err) => Err(err),
+            },
         }
-        self.len -= 1;
-        let value = seed.deserialize(&mut *self.deserializer)?;
-        Ok(Some(value))
     }
 }
 
-struct EnumAccess<'a> {
-    deserializer: &'a mut Deserializer,
+struct EnumAccess<'a, R> {
+    deserializer: &'a mut Deserializer<R>,
 }
 
-impl<'de, 'a> de::EnumAccess<'de> for EnumAccess<'a> {
+impl<'de, 'a, R: Read> de::EnumAccess<'de> for EnumAccess<'a, R> {
     type Error = KafkaError;
-    type Variant = VariantAccess<'a>;
+    type Variant = VariantAccess<'a, R>;
 
     fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
@@ -248,11 +247,11 @@ impl<'de, 'a> de::EnumAccess<'de> for EnumAccess<'a> {
     }
 }
 
-struct VariantAccess<'a> {
-    deserializer: &'a mut Deserializer,
+struct VariantAccess<'a, R> {
+    deserializer: &'a mut Deserializer<R>,
 }
 
-impl<'de, 'a> de::VariantAccess<'de> for VariantAccess<'a> {
+impl<'de, 'a, R: Read> de::VariantAccess<'de> for VariantAccess<'a, R> {
     type Error = KafkaError;
 
     fn unit_variant(self) -> Result<(), Self::Error> {
@@ -297,7 +296,6 @@ mod tests {
         a: i32,
         b: bool,
         c: String,
-        d: Option<i64>,
     }
 
     #[test]
@@ -309,7 +307,7 @@ mod tests {
             b'H', b'e', b'l', b'l', b'o', // c: String = "Hello"
         ];
 
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let result: TestStruct = Deserialize::deserialize(&mut deserializer).unwrap();
 
         assert_eq!(
@@ -318,7 +316,6 @@ mod tests {
                 a: 42,
                 b: true,
                 c: "Hello".to_string(),
-                d: None,
             }
         );
 
@@ -327,10 +324,9 @@ mod tests {
             0,  // b: bool = false
             0, 5, // c: String length = 5
             b'W', b'o', b'r', b'l', b'd', // c: String = "World"
-            0, 0, 0, 0, 0, 0, 0, 100, // d: i64 = 100
         ];
 
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let result: TestStruct = Deserialize::deserialize(&mut deserializer).unwrap();
 
         assert_eq!(
@@ -339,7 +335,6 @@ mod tests {
                 a: 10,
                 b: false,
                 c: "World".to_string(),
-                d: Some(100),
             }
         );
     }

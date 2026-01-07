@@ -1,6 +1,5 @@
-use crate::types::NullableString;
+use crate::types::{NullableString, TaggedFields};
 
-use super::TaggedFields;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

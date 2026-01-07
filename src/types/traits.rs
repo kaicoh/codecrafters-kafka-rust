@@ -1,5 +1,3 @@
-use crate::KafkaError;
-
 pub(crate) trait ByteSizeExt {
     fn byte_size(&self) -> usize;
 }

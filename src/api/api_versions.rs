@@ -1,16 +1,17 @@
 use crate::{
     Result,
     de::Deserializer,
-    types::{ByteSizeExt, CompactArray},
+    types::{ByteSizeExt, CompactArray, TaggedFields},
 };
 
 use super::{
     API_KEY_API_VERSIONS, API_KEY_DESCRIBE_TOPIC_PARTITIONS, ErrorCode, Message, RequestHeaderV1,
-    RequestHeaderV2, ResponseBody, ResponseHeader, TaggedFields,
+    RequestHeaderV2, ResponseBody, ResponseHeader,
 };
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 
-pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
+pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<Message> {
     match api_version {
         0 => {
             let req_header: RequestHeaderV1 = Deserialize::deserialize(&mut de)?;
@@ -56,7 +57,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
                 error_code: ErrorCode::NoError,
                 api_versions: supported_versions_v2(),
                 throttle_time_ms: 0,
-                tagged_fields: TaggedFields::new(vec![]),
+                tagged_fields: TaggedFields::new(None),
             });
             Ok(Message::new(res_header, Some(res_body)))
         }
@@ -69,7 +70,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
                 error_code: ErrorCode::NoError,
                 api_versions: supported_versions_v2(),
                 throttle_time_ms: 0,
-                tagged_fields: TaggedFields::new(vec![]),
+                tagged_fields: TaggedFields::new(None),
             });
             Ok(Message::new(res_header, Some(res_body)))
         }
@@ -82,7 +83,7 @@ pub(crate) fn run(api_version: i16, mut de: Deserializer) -> Result<Message> {
                 error_code: ErrorCode::UnsupportedVersion,
                 api_versions: CompactArray::new(Some(vec![])),
                 throttle_time_ms: 0,
-                tagged_fields: TaggedFields::new(vec![]),
+                tagged_fields: TaggedFields::new(None),
             });
             Ok(Message::new(res_header, Some(res_body)))
         }
@@ -187,13 +188,13 @@ fn supported_versions_v2() -> CompactArray<ApiVersionV2> {
             api_key: API_KEY_API_VERSIONS,
             min_version: 0,
             max_version: 4,
-            tagged_fields: TaggedFields::new(vec![]),
+            tagged_fields: TaggedFields::new(None),
         },
         ApiVersionV2 {
             api_key: API_KEY_DESCRIBE_TOPIC_PARTITIONS,
             min_version: 0,
             max_version: 0,
-            tagged_fields: TaggedFields::new(vec![]),
+            tagged_fields: TaggedFields::new(None),
         },
     ]))
 }

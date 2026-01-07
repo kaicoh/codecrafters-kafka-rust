@@ -37,6 +37,12 @@ where
     }
 }
 
+impl<L> LenPrefixEncode<L, String> {
+    pub(crate) fn as_str(&self) -> &str {
+        self.value.as_ref()
+    }
+}
+
 impl<L, T> ByteSizeExt for LenPrefixEncode<L, T>
 where
     L: AsDataLengthExt + ByteSizeExt,
@@ -400,6 +406,110 @@ impl<L, M, T> From<LenPrefixEncode<L, T>> for LenPrefixEncodeOpt<M, T> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LenPrefixObject<L, T> {
+    marker: PhantomData<L>,
+    value: T,
+}
+
+impl<L, T> LenPrefixObject<L, T> {
+    pub(crate) fn new(value: T) -> Self {
+        Self {
+            marker: PhantomData,
+            value,
+        }
+    }
+
+    pub(crate) fn as_ref(&self) -> &T {
+        &self.value
+    }
+
+    pub(crate) fn into_inner(self) -> T {
+        self.value
+    }
+}
+
+impl<L, T> ByteSizeExt for LenPrefixObject<L, T>
+where
+    L: AsDataLengthExt + ByteSizeExt,
+    T: ByteSizeExt,
+{
+    fn byte_size(&self) -> usize {
+        let inner_len = self.value.byte_size();
+        L::from_usize(inner_len).byte_size() + inner_len
+    }
+}
+
+impl<L, T> ser::Serialize for LenPrefixObject<L, T>
+where
+    L: AsDataLengthExt + ser::Serialize,
+    T: ByteSizeExt + ser::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        let len = L::from_usize(self.value.byte_size());
+        seq.serialize_element(&len)?;
+        seq.serialize_element(&self.value)?;
+        seq.end()
+    }
+}
+
+impl<'de, L, T> de::Deserialize<'de> for LenPrefixObject<L, T>
+where
+    L: AsDataLengthExt + de::DeserializeOwned,
+    T: de::DeserializeOwned,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct LenPrefixObjectVisitor<L, T>
+        where
+            L: AsDataLengthExt + de::DeserializeOwned,
+            T: de::DeserializeOwned,
+        {
+            marker: PhantomData<(L, T)>,
+        }
+
+        impl<'de, L, T> de::Visitor<'de> for LenPrefixObjectVisitor<L, T>
+        where
+            L: AsDataLengthExt + de::DeserializeOwned,
+            T: de::DeserializeOwned,
+        {
+            type Value = LenPrefixObject<L, T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an object with length prefix")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let _l: L = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::custom("missing length prefix"))?;
+
+                let value: T = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::custom("missing object value"))?;
+
+                Ok(LenPrefixObject::new(value))
+            }
+        }
+
+        deserializer.deserialize_tuple(
+            2,
+            LenPrefixObjectVisitor {
+                marker: PhantomData,
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -487,34 +597,34 @@ mod tests {
     #[test]
     fn test_len_prefix_deserialization() {
         let buf = vec![0x00, 0x05, b'h', b'e', b'l', b'l', b'o'];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: I16String = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, I16String::new("hello".into()));
 
         let buf = vec![0x00, 0x00, 0x00, 0x05, b'w', b'o', b'r', b'l', b'd'];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: I32Bytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, I32Bytes::new(b"world".to_vec()));
 
         let buf = vec![0x0C, b'v', b'a', b'r', b'i', b'n', b't'];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: VaintString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, VaintString::new("varint".into()));
 
         let buf = vec![0x08, b'u', b'v', b'a', b'r', b'i', b'n', b't'];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: UvarintString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, UvarintString::new("uvarint".into()));
 
         let buf = vec![
             0x00, 0x00, 0x00, 0x08, b'o', b'p', b't', b'i', b'o', b'n', b'a', b'l',
         ];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: I32OptString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, I32OptString::new(Some("optional".into())));
 
         let buf = vec![0xFF, 0xFF, 0xFF, 0xFF];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: I32OptString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, I32OptString::new(None));
 
@@ -524,7 +634,7 @@ mod tests {
             0x00, 0x03, b't', b'w', b'o', // "two"
             0x00, 0x05, b't', b'h', b'r', b'e', b'e', // "three"
         ];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: UvarintSeq = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             v,
@@ -536,7 +646,7 @@ mod tests {
         );
 
         let buf = vec![0x00];
-        let mut deserializer = Deserializer::new(buf);
+        let mut deserializer = Deserializer::new(&buf[..]);
         let v: UvarintSeq = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, UvarintSeq::new(None));
     }

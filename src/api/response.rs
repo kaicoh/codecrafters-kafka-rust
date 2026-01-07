@@ -1,6 +1,5 @@
-use crate::types::ByteSizeExt;
+use crate::types::{ByteSizeExt, TaggedFields};
 
-use super::TaggedFields;
 use serde::{
     Serialize,
     ser::{self, SerializeSeq},

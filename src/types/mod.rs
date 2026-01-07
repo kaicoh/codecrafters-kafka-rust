@@ -1,5 +1,6 @@
 mod base;
 mod records;
+mod tagged_field;
 mod traits;
 mod uuid;
 mod varint;
@@ -18,11 +19,14 @@ pub(crate) type NullableBytes = LenPrefixEncodeOpt<i32, Vec<u8>>;
 pub(crate) type CompactNullableBytes = LenPrefixEncodeOpt<Uvarint, Vec<u8>>;
 pub(crate) type Array<T> = LenPrefixSeq<i32, T>;
 pub(crate) type CompactArray<T> = LenPrefixSeq<Uvarint, T>;
+pub(crate) type TaggedFields = CompactArray<TaggedField>;
+pub(crate) use tagged_field::TaggedField;
 pub(crate) use uuid::Uuid;
 
 // Record values
 pub(crate) type VarintString = LenPrefixEncode<Varint, String>;
-pub(crate) type VarintBytes = LenPrefixEncode<Varint, Vec<u8>>;
+pub(crate) type VarintBytes = LenPrefixEncodeOpt<Varint, Vec<u8>>;
+pub(crate) use records::{Record, RecordBatch, RecordValue, RecordVariant};
 
 #[cfg(test)]
 mod tests {
@@ -42,7 +46,7 @@ mod tests {
     #[test]
     fn test_compact_string_deserialization() {
         let data = vec![6, b'h', b'e', b'l', b'l', b'o'];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactString::new("hello".to_string()));
     }
@@ -71,12 +75,12 @@ mod tests {
     #[test]
     fn test_nullable_string_deserialization() {
         let data = vec![0xFF, 0xFF];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: NullableString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, NullableString::new(None));
 
         let data = vec![0x00, 0x02, b'h', b'i'];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: NullableString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, NullableString::new(Some("hi".to_string())));
     }
@@ -108,12 +112,12 @@ mod tests {
     #[test]
     fn test_compact_nullable_string_deserialization() {
         let data = vec![0];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactNullableString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactNullableString::new(None));
 
         let data = vec![3, b'h', b'i'];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactNullableString = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactNullableString::new(Some("hi".to_string())));
     }
@@ -139,7 +143,7 @@ mod tests {
     #[test]
     fn test_bytes_deserialization() {
         let data = vec![0, 0, 0, 3, 1, 2, 3];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: Bytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, Bytes::new(vec![1, 2, 3]));
     }
@@ -162,7 +166,7 @@ mod tests {
     #[test]
     fn test_compact_bytes_deserialization() {
         let data = vec![4, 1, 2, 3];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactBytes::new(vec![1, 2, 3]));
     }
@@ -191,12 +195,12 @@ mod tests {
     #[test]
     fn test_nullable_bytes_deserialization() {
         let data = vec![0xFF, 0xFF, 0xFF, 0xFF];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: NullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, NullableBytes::new(None));
 
         let data = vec![0, 0, 0, 3, 1, 2, 3];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: NullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, NullableBytes::new(Some(vec![1, 2, 3])));
     }
@@ -228,12 +232,12 @@ mod tests {
     #[test]
     fn test_compact_nullable_bytes_deserialization() {
         let data = vec![0];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactNullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactNullableBytes::new(None));
 
         let data = vec![4, 1, 2, 3];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactNullableBytes = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactNullableBytes::new(Some(vec![1, 2, 3])));
     }
@@ -278,7 +282,7 @@ mod tests {
             0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
             0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
         ];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: Array<String> = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             v,
@@ -286,7 +290,7 @@ mod tests {
         );
 
         let data = vec![0xFF, 0xFF, 0xFF, 0xFF];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: Array<String> = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, Array::new(None));
     }
@@ -339,7 +343,7 @@ mod tests {
             0x00, 0x06, b's', b'e', b'c', b'o', b'n', b'd', // "second"
             0x00, 0x05, b't', b'h', b'i', b'r', b'd', // "third"
         ];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactArray<String> = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(
             v,
@@ -347,7 +351,7 @@ mod tests {
         );
 
         let data = vec![0];
-        let mut deserializer = Deserializer::new(data);
+        let mut deserializer = Deserializer::new(&data[..]);
         let v: CompactArray<String> = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(v, CompactArray::new(None));
     }
