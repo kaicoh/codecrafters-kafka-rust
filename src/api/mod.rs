@@ -3,6 +3,7 @@ use std::io::Read;
 
 mod api_versions;
 mod describe_topic_partitions;
+mod fetch;
 mod request;
 mod response;
 
@@ -28,6 +29,7 @@ pub(crate) fn handle(bytes: Vec<u8>) -> Result<Message> {
 
 fn route_request<R: Read>(api_key: i16, api_version: i16, de: Deserializer<R>) -> Result<Message> {
     match api_key {
+        API_KEY_FETCH => fetch::run(api_version, de),
         API_KEY_API_VERSIONS => api_versions::run(api_version, de),
         API_KEY_DESCRIBE_TOPIC_PARTITIONS => describe_topic_partitions::run(api_version, de),
         _ => Err(KafkaError::UnsupportedVersion {

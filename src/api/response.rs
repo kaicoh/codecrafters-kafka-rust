@@ -34,6 +34,7 @@ impl ByteSizeExt for ResponseHeader {
 pub(crate) enum ResponseBody {
     ApiVersions(super::api_versions::ApiVersionsResponseBody),
     DescribeTopicPartitions(super::describe_topic_partitions::DescribeTopicPartitionsResponseBody),
+    Fetch(super::fetch::FetchResponseBody),
 }
 
 impl ByteSizeExt for ResponseBody {
@@ -41,6 +42,7 @@ impl ByteSizeExt for ResponseBody {
         match self {
             Self::ApiVersions(body) => body.byte_size(),
             Self::DescribeTopicPartitions(body) => body.byte_size(),
+            Self::Fetch(body) => body.byte_size(),
         }
     }
 }
