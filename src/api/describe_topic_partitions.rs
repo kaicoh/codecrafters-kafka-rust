@@ -32,16 +32,23 @@ pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<
             )?;
             let record_slice = records.as_slice();
 
-            let topics = req_body
+            let mut topics: Vec<ResponseTopic> = req_body
                 .topics
                 .into_iter()
                 .map(make_response(record_slice))
                 .collect();
 
+            topics.sort_by(|a, b| match (a.name.as_ref(), b.name.as_ref()) {
+                (Some(name_a), Some(name_b)) => name_a.cmp(name_b),
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (None, None) => std::cmp::Ordering::Equal,
+            });
+
             let res_body =
                 ResponseBody::DescribeTopicPartitions(DescribeTopicPartitionsResponseBody::V0 {
                     throttle_time_ms: 0,
-                    topics,
+                    topics: CompactArray::new(Some(topics)),
                     next_cursor: NextCursor(None),
                     tagged_fields: TaggedFields::new(None),
                 });
