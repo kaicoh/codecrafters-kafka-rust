@@ -2,19 +2,17 @@ use crate::{
     Result,
     de::Deserializer,
     types::{
-        ByteSizeExt, CompactArray, CompactNullableString, CompactString, RecordBatch,
-        RecordVariant, TaggedFields, Uuid,
+        ByteSizeExt, CompactArray, CompactNullableString, CompactString, RecordVariant,
+        TaggedFields, Uuid,
     },
 };
 
 use super::{
     API_KEY_DESCRIBE_TOPIC_PARTITIONS, ErrorCode, Message, RequestHeaderV2, ResponseBody,
-    ResponseHeader,
+    ResponseHeader, read_meta_records,
 };
 use serde::{Deserialize, Serialize, ser};
-use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 
 pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<Message> {
     match api_version {
@@ -27,9 +25,7 @@ pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<
                 tagged_fields: TaggedFields::new(None),
             };
 
-            let records = read_meta(
-                "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log",
-            )?;
+            let records = read_meta_records()?;
 
             let mut topics: Vec<ResponseTopic> = req_body
                 .topics
@@ -204,20 +200,6 @@ impl ByteSizeExt for NextCursor {
             None => 1, // size of int8
         }
     }
-}
-
-fn read_meta<P: AsRef<Path>>(path: P) -> Result<Vec<RecordVariant>> {
-    // Placeholder for reading metadata from a file if needed in the future
-    let file = File::open(path)?;
-    let records: Vec<RecordVariant> = RecordBatch::from_reader(file)?
-        .into_iter()
-        .flat_map(|record_batch| {
-            record_batch
-                .into_iter()
-                .map(|record| record.value.into_inner().value)
-        })
-        .collect();
-    Ok(records)
 }
 
 fn make_response(slice: &[RecordVariant]) -> Box<dyn Fn(RequestTopic) -> ResponseTopic + '_> {

@@ -1,5 +1,11 @@
-use crate::{KafkaError, Result, de::Deserializer};
+use crate::{
+    KafkaError, Result,
+    de::Deserializer,
+    types::{RecordBatch, RecordVariant},
+};
+use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
 mod api_versions;
 mod describe_topic_partitions;
@@ -37,4 +43,21 @@ fn route_request<R: Read>(api_key: i16, api_version: i16, de: Deserializer<R>) -
             api_version,
         }),
     }
+}
+
+fn read_meta_records() -> Result<Vec<RecordVariant>> {
+    read_meta("/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log")
+}
+
+fn read_meta<P: AsRef<Path>>(path: P) -> Result<Vec<RecordVariant>> {
+    let file = File::open(path)?;
+    let records: Vec<RecordVariant> = RecordBatch::from_reader(file)?
+        .into_iter()
+        .flat_map(|record_batch| {
+            record_batch
+                .into_iter()
+                .map(|record| record.value.into_inner().value)
+        })
+        .collect();
+    Ok(records)
 }

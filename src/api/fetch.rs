@@ -1,10 +1,16 @@
 use crate::{
     Result,
     de::Deserializer,
-    types::{ByteSizeExt, CompactArray, CompactNullableBytes, CompactString, TaggedFields, Uuid},
+    types::{
+        ByteSizeExt, CompactArray, CompactNullableBytes, CompactString, RecordVariant,
+        TaggedFields, Uuid,
+    },
 };
 
-use super::{API_KEY_FETCH, ErrorCode, Message, RequestHeaderV2, ResponseBody, ResponseHeader};
+use super::{
+    API_KEY_FETCH, ErrorCode, Message, RequestHeaderV2, ResponseBody, ResponseHeader,
+    read_meta_records,
+};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 
@@ -19,6 +25,21 @@ pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<
                 tagged_fields: TaggedFields::new(None),
             };
 
+            let topics = req_body.topics.as_opt_slice();
+
+            if topics.is_none() || topics.is_some_and(|t| t.is_empty()) {
+                let res_body = ResponseBody::Fetch(FetchResponseBody {
+                    throttle_time_ms: 0,
+                    error_code: ErrorCode::NoError,
+                    session_id: 0,
+                    responses: CompactArray::new(Some(vec![])),
+                    tagged_fields: TaggedFields::new(None),
+                });
+                return Ok(Message::new(res_header, Some(res_body)));
+            }
+
+            let records = read_meta_records()?;
+
             let responses = req_body
                 .topics
                 .into_iter()
@@ -27,17 +48,7 @@ pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<
                     partitions: topic
                         .partitions
                         .into_iter()
-                        .map(|partition| FetchResponsePartition {
-                            partition_index: partition.partition_index,
-                            error_code: ErrorCode::UnknownTopicId,
-                            high_watermark: 0,
-                            last_stable_offset: 0,
-                            log_start_offset: 0,
-                            aborted_transactions: CompactArray::new(None),
-                            preferred_read_replica: 0,
-                            records: CompactNullableBytes::new(None),
-                            tagged_fields: TaggedFields::new(None),
-                        })
+                        .map(make_response(topic.id, records.as_slice()))
                         .collect(),
                     tagged_fields: TaggedFields::new(None),
                 })
@@ -171,4 +182,42 @@ impl ByteSizeExt for AbortedTransaction {
             + self.first_offset.byte_size()
             + self.tagged_fields.byte_size()
     }
+}
+
+fn make_response(
+    topic_id: Uuid,
+    slice: &[RecordVariant],
+) -> Box<dyn Fn(FetchRequestPartition) -> FetchResponsePartition + '_> {
+    Box::new(move |partition: FetchRequestPartition| {
+        match slice.iter().find(|record| {
+            if let RecordVariant::Partition(p) = record {
+                p.partition_id == partition.partition_index && p.topic_id == topic_id
+            } else {
+                false
+            }
+        }) {
+            Some(RecordVariant::Partition(_)) => FetchResponsePartition {
+                partition_index: partition.partition_index,
+                error_code: ErrorCode::NoError,
+                high_watermark: 0,
+                last_stable_offset: 0,
+                log_start_offset: 0,
+                aborted_transactions: CompactArray::new(None),
+                preferred_read_replica: -1,
+                records: CompactNullableBytes::new(Some(vec![])),
+                tagged_fields: TaggedFields::new(None),
+            },
+            _ => FetchResponsePartition {
+                partition_index: partition.partition_index,
+                error_code: ErrorCode::UnknownTopicId,
+                high_watermark: 0,
+                last_stable_offset: 0,
+                log_start_offset: 0,
+                aborted_transactions: CompactArray::new(None),
+                preferred_read_replica: 0,
+                records: CompactNullableBytes::new(None),
+                tagged_fields: TaggedFields::new(None),
+            },
+        }
+    })
 }
