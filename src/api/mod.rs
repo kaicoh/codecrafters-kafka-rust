@@ -9,6 +9,7 @@ mod response;
 use request::{RequestHeaderV1, RequestHeaderV2};
 use response::{ErrorCode, Message, ResponseBody, ResponseHeader};
 
+const API_KEY_FETCH: i16 = 1;
 const API_KEY_API_VERSIONS: i16 = 18;
 const API_KEY_DESCRIBE_TOPIC_PARTITIONS: i16 = 75;
 

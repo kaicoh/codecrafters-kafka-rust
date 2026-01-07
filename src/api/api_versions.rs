@@ -5,8 +5,8 @@ use crate::{
 };
 
 use super::{
-    API_KEY_API_VERSIONS, API_KEY_DESCRIBE_TOPIC_PARTITIONS, ErrorCode, Message, RequestHeaderV1,
-    RequestHeaderV2, ResponseBody, ResponseHeader,
+    API_KEY_API_VERSIONS, API_KEY_DESCRIBE_TOPIC_PARTITIONS, API_KEY_FETCH, ErrorCode, Message,
+    RequestHeaderV1, RequestHeaderV2, ResponseBody, ResponseHeader,
 };
 use serde::{Deserialize, Serialize};
 use std::io::Read;
@@ -170,6 +170,11 @@ impl ByteSizeExt for ApiVersionV2 {
 fn supported_versions_v1() -> CompactArray<ApiVersionV1> {
     CompactArray::new(Some(vec![
         ApiVersionV1 {
+            api_key: API_KEY_FETCH,
+            min_version: 4,
+            max_version: 16,
+        },
+        ApiVersionV1 {
             api_key: API_KEY_API_VERSIONS,
             min_version: 0,
             max_version: 4,
@@ -184,6 +189,12 @@ fn supported_versions_v1() -> CompactArray<ApiVersionV1> {
 
 fn supported_versions_v2() -> CompactArray<ApiVersionV2> {
     CompactArray::new(Some(vec![
+        ApiVersionV2 {
+            api_key: API_KEY_FETCH,
+            min_version: 4,
+            max_version: 16,
+            tagged_fields: TaggedFields::new(None),
+        },
         ApiVersionV2 {
             api_key: API_KEY_API_VERSIONS,
             min_version: 0,
