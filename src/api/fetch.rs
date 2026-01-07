@@ -12,19 +12,45 @@ pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<
     match api_version {
         16 => {
             let req_header: RequestHeaderV2 = Deserialize::deserialize(&mut de)?;
-            let _req_body: FetchRequestBody = Deserialize::deserialize(&mut de)?;
+            let req_body: FetchRequestBody = Deserialize::deserialize(&mut de)?;
 
             let res_header = ResponseHeader::V1 {
                 correlation_id: req_header.correlation_id,
                 tagged_fields: TaggedFields::new(None),
             };
+
+            let responses = req_body
+                .topics
+                .into_iter()
+                .map(|topic| FetchResponseTopic {
+                    id: topic.id,
+                    partitions: topic
+                        .partitions
+                        .into_iter()
+                        .map(|partition| FetchResponsePartition {
+                            partition_index: partition.partition_index,
+                            error_code: ErrorCode::UnknownTopicId,
+                            high_watermark: 0,
+                            last_stable_offset: 0,
+                            log_start_offset: 0,
+                            aborted_transactions: CompactArray::new(None),
+                            preferred_read_replica: 0,
+                            records: CompactNullableBytes::new(None),
+                            tagged_fields: TaggedFields::new(None),
+                        })
+                        .collect(),
+                    tagged_fields: TaggedFields::new(None),
+                })
+                .collect();
+
             let res_body = ResponseBody::Fetch(FetchResponseBody {
                 throttle_time_ms: 0,
                 error_code: ErrorCode::NoError,
                 session_id: 0,
-                responses: CompactArray::new(Some(vec![])),
+                responses,
                 tagged_fields: TaggedFields::new(None),
             });
+
             Ok(Message::new(res_header, Some(res_body)))
         }
         _ => Err(crate::KafkaError::UnsupportedVersion {
