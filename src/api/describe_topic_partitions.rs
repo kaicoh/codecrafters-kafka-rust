@@ -30,12 +30,11 @@ pub(crate) fn run<R: Read>(api_version: i16, mut de: Deserializer<R>) -> Result<
             let records = read_meta(
                 "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log",
             )?;
-            let record_slice = records.as_slice();
 
             let mut topics: Vec<ResponseTopic> = req_body
                 .topics
                 .into_iter()
-                .map(make_response(record_slice))
+                .map(make_response(records.as_slice()))
                 .collect();
 
             topics.sort_by(|a, b| match (a.name.as_ref(), b.name.as_ref()) {
